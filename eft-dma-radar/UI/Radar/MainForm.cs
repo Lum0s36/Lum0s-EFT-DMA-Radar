@@ -1896,9 +1896,6 @@ namespace eft_dma_radar.UI.Radar
             if (_fpsSw.ElapsedMilliseconds >= 1000)
             {
                 var fps = Interlocked.Exchange(ref _fps, 0); // Get FPS -> Reset FPS counter
-                var title = Program.Name;
-                if (inRaid) title += $" ({fps} fps)";
-                Text = title; // Set new window title
                 _fpsSw.Restart();
             }
             else
@@ -3549,15 +3546,5 @@ namespace eft_dma_radar.UI.Radar
         }
 
         #endregion
-
-        private void linkLabel_CheckForUpdates_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
-        {
-            const string updatesUrl = "https://lone-eft.com/ongoingsupport";
-            Process.Start(new ProcessStartInfo()
-            {
-                FileName = updatesUrl,
-                UseShellExecute = true
-            });
-        }
     }
 }
