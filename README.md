@@ -1,7 +1,7 @@
 
 # Lone's EFT DMA Radar
 
-![icon-static](https://github.com/user-attachments/assets/d3bc58ad-a987-4c94-bfe2-dd2236769f19)
+![icon-static](https://github.com/user-attachments/assets/d2b02f5a-298c-45fd-8154-2331f1f21c0f)
 
 ## What is this?
 - This is an up-to-date build of Lone DMA EFT/~~Arena Radar~~. This is a standalone copy of the software with *No Restrictions*.
