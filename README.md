@@ -31,7 +31,7 @@
 - Mambo
   - Helping with quite a lot of things & especially stuff I didnt wanna do
    - Paypal: https://paypal.me/MamboNoob?country.x=CA&locale.x=en_US
-   - BTC: `bc1qlw807xlyglfq6h33kg753npv7cstlms8yz7w2wrazp932u3zsdxqhpf583`
+   - BTC: `bc1qgw9v6xtwxqhtsuuge720lr5vrhfv596wqml2mk`
 - Marazm
   - Keeping EFT & Arena maps updated
    - https://boosty.to/dma_maps/donate
