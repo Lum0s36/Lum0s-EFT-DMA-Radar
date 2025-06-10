@@ -203,7 +203,7 @@ namespace eft_dma_radar.UI.Pages
         {
             _playerHistory = Player.PlayerHistory;
 
-            playerHistoryDataGrid.ItemsSource = _playerHistory.GetReferenceUnsafe();
+            RefreshDataGrid();
 
             var lastSeenColumn = playerHistoryDataGrid.Columns.FirstOrDefault(c => c.Header?.ToString() == "Last Seen");
             if (lastSeenColumn != null)
@@ -215,6 +215,15 @@ namespace eft_dma_radar.UI.Pages
             _playerHistory.EntriesChanged += PlayerHistory_EntriesChanged;
 
             StartTimeUpdateTimer();
+        }
+
+        private void RefreshDataGrid()
+        {
+            if (_playerHistory != null)
+            {
+                var entries = _playerHistory.GetReferenceUnsafe().ToList();
+                playerHistoryDataGrid.ItemsSource = entries;
+            }
         }
 
         private void StartTimeUpdateTimer()
@@ -229,12 +238,13 @@ namespace eft_dma_radar.UI.Pages
 
         private void TimeUpdateTimer_Tick(object sender, EventArgs e)
         {
-            var entries = _playerHistory?.GetReferenceUnsafe();
-            if (entries != null)
+            if (_playerHistory != null)
             {
-                foreach (var entry in entries)
+                var entries = _playerHistory.GetReferenceUnsafe();
+                if (entries != null && entries.Count > 0)
                 {
-                    entry.RefreshLastSeenFormatted();
+                    RefreshDataGrid();
+                    RefreshSorting();
                 }
             }
         }
@@ -331,11 +341,13 @@ namespace eft_dma_radar.UI.Pages
             if (!Dispatcher.CheckAccess())
             {
                 Dispatcher.Invoke(() => {
+                    RefreshDataGrid();
                     RefreshSorting();
                 });
             }
             else
             {
+                RefreshDataGrid();
                 RefreshSorting();
             }
         }

@@ -193,8 +193,7 @@ namespace eft_dma_radar.UI.Pages
             {
                 LoadWatchlistFromFile();
                 ToggleUsernameControl();
-
-                watchlistListView.ItemsSource = Player.PlayerWatchlist.GetReferenceUnsafe();
+                RefreshWatchlistView();
 
                 LoneLogging.WriteLine($"[Watchlist] Loaded {Player.PlayerWatchlist.Entries.Count} entries");
             }
@@ -202,6 +201,15 @@ namespace eft_dma_radar.UI.Pages
             {
                 LoneLogging.WriteLine($"[Watchlist] Error loading: {ex}");
                 NotificationsShared.Error($"Error loading watchlist: {ex.Message}");
+            }
+        }
+
+        private void RefreshWatchlistView()
+        {
+            if (Player.PlayerWatchlist != null)
+            {
+                var entries = Player.PlayerWatchlist.GetReferenceUnsafe().ToList();
+                watchlistListView.ItemsSource = entries;
             }
         }
 
@@ -294,6 +302,7 @@ namespace eft_dma_radar.UI.Pages
                 UpdateActivePlayersMatchingWatchlist(id, true);
 
                 SaveWatchlistToFile();
+                RefreshWatchlistView();
                 ClearForm();
                 NotificationsShared.Success($"Updated entry for {id} successfully!");
             }
@@ -313,6 +322,7 @@ namespace eft_dma_radar.UI.Pages
                         existing.StreamingPlatform = platform;
 
                         UpdateActivePlayersMatchingWatchlist(id, true);
+                        RefreshWatchlistView();
                     }
                 }
                 else
@@ -327,6 +337,7 @@ namespace eft_dma_radar.UI.Pages
 
                     bindingList.Add(newEntry);
                     UpdateActivePlayersMatchingWatchlist(id, true);
+                    RefreshWatchlistView();
                 }
 
                 SaveWatchlistToFile();
@@ -353,6 +364,7 @@ namespace eft_dma_radar.UI.Pages
 
                     UpdateActivePlayersMatchingWatchlist(accountId, false);
                     SaveWatchlistToFile();
+                    RefreshWatchlistView();
                     ClearForm();
 
                     NotificationsShared.Success($"Removed player from watchlist.");
@@ -660,6 +672,7 @@ namespace eft_dma_radar.UI.Pages
                 }
 
                 SaveWatchlistToFile();
+                RefreshWatchlistView();
 
                 var message = result == MessageBoxResult.No
                     ? $"[Watchlist] Replaced all entries. Imported {replacedCount} entries."
@@ -737,6 +750,7 @@ namespace eft_dma_radar.UI.Pages
             bindingList.Add(newEntry);
             UpdateActivePlayersMatchingWatchlist(accountId, true);
             SaveWatchlistToFile();
+            RefreshWatchlistView();
 
             NotificationsShared.Success($"[WatchList] Added {playerName} to watchlist.");
         }

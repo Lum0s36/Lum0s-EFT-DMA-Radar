@@ -20,7 +20,7 @@ namespace eft_dma_radar.UI.Misc
     /// <summary>
     /// Represents a PMC in the PMC History log.
     /// </summary>
-    public sealed class PlayerHistoryEntry : INotifyPropertyChanged
+    public sealed class PlayerHistoryEntry
     {
         private readonly Player _player;
         private DateTime _lastSeen;
@@ -72,15 +72,7 @@ namespace eft_dma_radar.UI.Misc
         public DateTime LastSeen
         {
             get => _lastSeen;
-            private set
-            {
-                if (_lastSeen != value)
-                {
-                    _lastSeen = value;
-                    OnPropertyChanged();
-                    OnPropertyChanged(nameof(LastSeenFormatted));
-                }
-            }
+            private set => _lastSeen = value;
         }
 
         /// <summary>
@@ -132,107 +124,36 @@ namespace eft_dma_radar.UI.Misc
         {
             LastSeen = timestamp;
         }
-
-        /// <summary>
-        /// Refreshes the LastSeenFormatted property to trigger UI update
-        /// </summary>
-        public void RefreshLastSeenFormatted()
-        {
-            OnPropertyChanged(nameof(LastSeenFormatted));
-        }
-
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        private void OnPropertyChanged([CallerMemberName] string propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
     }
 
     /// <summary>
     /// JSON Wrapper for Player Watchlist.
     /// </summary>
-    public sealed class PlayerWatchlistEntry : INotifyPropertyChanged
+    public sealed class PlayerWatchlistEntry
     {
-        private string _accountID = string.Empty;
-        private string _reason = string.Empty;
-        private StreamingPlatform _streamingPlatform = StreamingPlatform.None;
-        private string _username = string.Empty;
-
         /// <summary>
         /// Player's Account ID as obtained from Player History.
         /// </summary>
         [JsonPropertyName("acctID")]
-        public string AccountID
-        {
-            get => _accountID;
-            set
-            {
-                if (_accountID != value)
-                {
-                    _accountID = value;
-                    OnPropertyChanged();
-                }
-            }
-        }
+        public string AccountID { get; set; } = string.Empty;
 
         /// <summary>
         /// Reason for adding player to Watchlist (ex: Cheater, streamer name,etc.)
         /// </summary>
         [JsonPropertyName("reason")]
-        public string Reason
-        {
-            get => _reason;
-            set
-            {
-                if (_reason != value)
-                {
-                    _reason = value;
-                    OnPropertyChanged();
-                }
-            }
-        }
+        public string Reason { get; set; } = string.Empty;
 
         /// <summary>
         /// The streaming platform (Twitch, YouTube, etc.)
         /// </summary>
         [JsonPropertyName("platform")]
-        public StreamingPlatform StreamingPlatform
-        {
-            get => _streamingPlatform;
-            set
-            {
-                if (_streamingPlatform != value)
-                {
-                    _streamingPlatform = value;
-                    OnPropertyChanged();
-                }
-            }
-        }
+        public StreamingPlatform StreamingPlatform { get; set; } = StreamingPlatform.None;
 
         /// <summary>
         /// The platform username
         /// </summary>
         [JsonPropertyName("username")]
-        public string Username
-        {
-            get => _username;
-            set
-            {
-                if (_username != value)
-                {
-                    _username = value;
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        private void OnPropertyChanged([CallerMemberName] string propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
+        public string Username { get; set; } = string.Empty;
     }
 
     public sealed class ScreenEntry
