@@ -42,7 +42,7 @@
     - https://buymeacoffee.com/kekmate
 
 ## Contact
-- For any inquiries or assistance, feel free to join the [EFT Educational Resources Discord Server](https://discord.gg/jGSnTCekdx). Please confine discussion to the [Lone DMA Section](https://discord.com/channels/1218731239599767632/1342207117704036382).
+- For any inquiries or assistance, feel free to join the [EFT Educational Resources Discord Server](https://discord.gg/hxUhJHWuap). Please confine discussion to the [Lone DMA Section](https://discord.com/channels/1218731239599767632/1342207117704036382).
 - Report any major outages (after a game update,etc.) by opening an [Issue](https://github.com/Lone83427/lone-eft-dma-radar/issues). Please be *as detailed as possible*, don't just say "it's broke".
   - This is **NOT** for feature requests or suggestions.
   - Misuse of the Issues category will result in the privilege being revoked for that user.
