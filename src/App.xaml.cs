@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Lone EFT DMA Radar
  * Brought to you by Lone (Lone DMA)
  * 
@@ -45,21 +45,19 @@ global using System.Text;
 global using System.Text.Json;
 global using System.Text.Json.Serialization;
 global using System.Windows;
-global using RateLimiter = LoneEftDmaRadar.Misc.RateLimiter;
-using LoneEftDmaRadar.Misc.JSON;
+using LoneEftDmaRadar.DMA;
 using LoneEftDmaRadar.Misc.Services;
 using LoneEftDmaRadar.Tarkov;
 using LoneEftDmaRadar.UI.ColorPicker;
 using LoneEftDmaRadar.UI.Misc;
 using LoneEftDmaRadar.UI.Radar.Maps;
 using LoneEftDmaRadar.UI.Skia;
+using LoneEftDmaRadar.UI.ESP;
 using LoneEftDmaRadar.Web.EftApiTech;
 using LoneEftDmaRadar.Web.TarkovDev.Data;
 using LoneEftDmaRadar.Web.TarkovDev.Profiles;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net.Http;
-using Velopack;
-using Velopack.Sources;
 
 namespace LoneEftDmaRadar
 {
@@ -68,7 +66,7 @@ namespace LoneEftDmaRadar
     /// </summary>
     public partial class App : Application
     {
-        internal const string Name = "Lone EFT DMA Radar";
+        internal const string Name = "Gaming Chair - EFT DMA RADAR";
         private const string MUTEX_ID = "0f908ff7-e614-6a93-60a3-cee36c9cea91";
         private static readonly Mutex _mutex;
 
@@ -76,7 +74,7 @@ namespace LoneEftDmaRadar
         /// Path to the Configuration Folder in %AppData%
         /// </summary>
         public static DirectoryInfo ConfigPath { get; } =
-            new(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Lone-EFT-DMA"));
+            new(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Lum0s-EFT-DMA"));
         /// <summary>
         /// Global Program Configuration.
         /// </summary>
@@ -94,24 +92,11 @@ namespace LoneEftDmaRadar
         /// TRUE if the application is currently using Dark Mode resources, otherwise FALSE for Light Mode.
         /// </summary>
         public static bool IsDarkMode { get; private set; }
-        /// <summary>
-        /// Default JSON Options for this App Domain.
-        /// </summary>
-        public static JsonSerializerOptions JsonOptions { get; } = new()
-        {
-            Converters = { Vector2JsonConverter.Instance, Vector3JsonConverter.Instance },
-            WriteIndented = true,
-            PropertyNameCaseInsensitive = true,
-            AllowTrailingCommas = true,
-            NumberHandling = JsonNumberHandling.AllowReadingFromString,
-            ReadCommentHandling = JsonCommentHandling.Skip
-        };
 
         static App()
         {
             try
             {
-                VelopackApp.Build().Run();
                 _mutex = new Mutex(true, MUTEX_ID, out bool singleton);
                 if (!singleton)
                     throw new InvalidOperationException("The application is already running.");
@@ -126,14 +111,18 @@ namespace LoneEftDmaRadar
                 throw;
             }
         }
-
+        
         protected override async void OnStartup(StartupEventArgs e)
         {
             try
             {
                 base.OnStartup(e);
+                
                 using var loading = new LoadingWindow();
                 await ConfigureProgramAsync(loadingWindow: loading);
+
+                //DebugLogger.Toggle(); // Auto-open debug console
+
                 MainWindow = new MainWindow();
                 MainWindow.Show();
             }
@@ -148,6 +137,7 @@ namespace LoneEftDmaRadar
         {
             try
             {
+                ESPManager.CloseESP();
                 Config.Save();
             }
             finally
@@ -163,11 +153,18 @@ namespace LoneEftDmaRadar
         /// </summary>
         private async Task ConfigureProgramAsync(LoadingWindow loadingWindow)
         {
-            await loadingWindow.ViewModel.UpdateProgressAsync(15, "Loading, Please Wait...");
-            _ = Task.Run(CheckForUpdatesAsync); // Run continuations on the thread pool
+            await loadingWindow.ViewModel.UpdateProgressAsync(5, "Initializing...", "Preparing application environment");
+            await Task.Delay(100);
+
+            await loadingWindow.ViewModel.UpdateProgressAsync(10, "Loading Configuration", "Reading settings and preferences");
+            await Task.Delay(100);
+
+            await loadingWindow.ViewModel.UpdateProgressAsync(15, "Initializing Modules", "Starting core components");
+            
+            // Start all modules in parallel
             var tarkovDataManager = TarkovDataManager.ModuleInitAsync();
             var eftMapManager = EftMapManager.ModuleInitAsync();
-            var memoryInterface = Memory.ModuleInitAsync();
+            var memoryInterface = MemoryInterface.ModuleInitAsync();
             var misc = Task.Run(() =>
             {
                 IsDarkMode = GetIsDarkMode();
@@ -179,8 +176,34 @@ namespace LoneEftDmaRadar
                 RuntimeHelpers.RunClassConstructor(typeof(LocalCache).TypeHandle);
                 RuntimeHelpers.RunClassConstructor(typeof(ColorPickerViewModel).TypeHandle);
             });
+
+            // Update progress while modules are loading
+            await loadingWindow.ViewModel.UpdateProgressAsync(20, "Loading Game Data", "Loading items, containers, and map data from TarkovDataManager");
+            await Task.Delay(100);
+            
+            await loadingWindow.ViewModel.UpdateProgressAsync(30, "Loading Maps", "Initializing map configurations and resources");
+            await Task.Delay(100);
+            
+            await loadingWindow.ViewModel.UpdateProgressAsync(40, "Initializing DMA", "Connecting to DMA device and memory interface");
+            await Task.Delay(100);
+            
+            await loadingWindow.ViewModel.UpdateProgressAsync(50, "Initializing UI", "Setting up UI components, themes, and color picker");
+            await Task.Delay(100);
+
+            // Wait for all tasks to complete
             await Task.WhenAll(tarkovDataManager, eftMapManager, memoryInterface, misc);
-            await loadingWindow.ViewModel.UpdateProgressAsync(100, "Loading Completed!");
+
+            await loadingWindow.ViewModel.UpdateProgressAsync(70, "Modules Loaded", "All core modules initialized successfully");
+            await Task.Delay(150);
+
+            await loadingWindow.ViewModel.UpdateProgressAsync(85, "Finalizing", "Completing initialization and preparing services");
+            await Task.Delay(100);
+
+            await loadingWindow.ViewModel.UpdateProgressAsync(95, "Almost Ready", "Preparing main window and user interface");
+            await Task.Delay(100);
+
+            await loadingWindow.ViewModel.UpdateProgressAsync(100, "Loading Completed!", "Application ready - Welcome to EFT DMA Radar");
+            
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
         }
 
@@ -192,7 +215,6 @@ namespace LoneEftDmaRadar
         /// <summary>
         /// Sets up the Dependency Injection container for the application.
         /// </summary>
-        /// <returns></returns>
         private static IServiceProvider BuildServiceProvider()
         {
             var services = new ServiceCollection();
@@ -214,10 +236,10 @@ namespace LoneEftDmaRadar
                                            EXECUTION_STATE.ES_DISPLAY_REQUIRED);
             var highPerformanceGuid = new Guid("8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c");
             if (PowerSetActiveScheme(IntPtr.Zero, ref highPerformanceGuid) != 0)
-                Debug.WriteLine("WARNING: Unable to set High Performance Power Plan");
+                DebugLogger.LogDebug("WARNING: Unable to set High Performance Power Plan");
             const uint timerResolutionMs = 5;
             if (TimeBeginPeriod(timerResolutionMs) != 0)
-                Debug.WriteLine($"WARNING: Unable to set timer resolution to {timerResolutionMs}ms. This may cause performance issues.");
+                DebugLogger.LogDebug($"WARNING: Unable to set timer resolution to {timerResolutionMs}ms. This may cause performance issues.");
         }
 
         /// <summary>
@@ -226,67 +248,8 @@ namespace LoneEftDmaRadar
         /// </summary>
         private static bool GetIsDarkMode()
         {
-            try
-            {
-                foreach (var dict in Application.Current.Resources.MergedDictionaries)
-                {
-                    foreach (var inner in dict.MergedDictionaries)
-                    {
-                        if (inner.Source?.ToString() is string src)
-                        {
-                            if (src.Contains("/Theme/Dark.xaml", StringComparison.OrdinalIgnoreCase))
-                                return true;
-                            if (src.Contains("/Theme/Light.xaml", StringComparison.OrdinalIgnoreCase))
-                                return false;
-                        }
-                    }
-                }
-            }
-            catch { }
-            // fallback: assume light if nothing matched
-            return false;
-        }
-
-        private static async Task CheckForUpdatesAsync()
-        {
-            try
-            {
-                var updater = new UpdateManager(
-                    source: new GithubSource(
-                        repoUrl: "https://github.com/lone-dma/Lone-EFT-DMA-Radar",
-                        accessToken: null,
-                        prerelease: false));
-                if (!updater.IsInstalled)
-                    return;
-
-                var newVersion = await updater.CheckForUpdatesAsync();
-                if (newVersion is not null)
-                {
-                    var result = MessageBox.Show(
-                        messageBoxText: $"A new version ({newVersion.TargetFullRelease.Version}) is available.\n\nWould you like to update now?",
-                        caption: App.Name,
-                        button: MessageBoxButton.YesNo,
-                        icon: MessageBoxImage.Question,
-                        defaultResult: MessageBoxResult.Yes,
-                        options: MessageBoxOptions.DefaultDesktopOnly);
-
-                    if (result == MessageBoxResult.Yes)
-                    {
-                        await updater.DownloadUpdatesAsync(newVersion);
-                        updater.ApplyUpdatesAndRestart(newVersion);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    messageBoxText: $"An unhandled exception occurred while checking for updates: {ex}",
-                    caption: App.Name,
-                    button: MessageBoxButton.OK,
-                    icon: MessageBoxImage.Warning,
-                    defaultResult: MessageBoxResult.OK,
-                    options: MessageBoxOptions.DefaultDesktopOnly);
-            }
+            // Force dark mode resources regardless of detected theme.
+            return true;
         }
 
         [LibraryImport("kernel32.dll")]
@@ -299,8 +262,6 @@ namespace LoneEftDmaRadar
             ES_CONTINUOUS = 0x80000000,
             ES_DISPLAY_REQUIRED = 0x00000002,
             ES_SYSTEM_REQUIRED = 0x00000001
-            // Legacy flag, should not be used.
-            // ES_USER_PRESENT = 0x00000004
         }
 
         [LibraryImport("powrprof.dll")]

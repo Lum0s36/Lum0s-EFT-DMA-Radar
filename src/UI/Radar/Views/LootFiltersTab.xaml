@@ -22,10 +22,13 @@
     <UserControl.Resources>
         <misc:StringToBrushConverter x:Key="StringToBrushConverter" />
         <misc:StringToColorConverter x:Key="StringToColorConverter" />
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
     </UserControl.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <!-- show wishlisted row -->
             <RowDefinition Height="Auto" />
             <!-- filter selector -->
             <RowDefinition Height="Auto" />
@@ -34,10 +37,28 @@
             <!-- main grid -->
         </Grid.RowDefinitions>
 
-        <!-- Row 0: Filter selector -->
+        <!-- Row 0: Show Wishlisted checkbox with color picker -->
         <StackPanel Orientation="Horizontal"
                     Margin="5"
                     Grid.Row="0">
+            <CheckBox Content="Show Wishlisted"
+                      IsChecked="{Binding ShowWishlistedRadar, Mode=TwoWay}"
+                      VerticalAlignment="Center"
+                      ToolTip="Show all wishlist items on the Radar with a special marker"
+                      Margin="0,0,10,0" />
+            <TextBlock Text="Color:"
+                       VerticalAlignment="Center"
+                       Margin="0,0,5,0" />
+            <xctk:ColorPicker SelectedColor="{Binding WishlistColorRadar, Mode=TwoWay, Converter={StaticResource StringToColorConverter}}"
+                              DisplayColorAndName="True"
+                              Width="120"
+                              IsEnabled="{Binding ShowWishlistedRadar}" />
+        </StackPanel>
+
+        <!-- Row 1: Filter selector -->
+        <StackPanel Orientation="Horizontal"
+                    Margin="5"
+                    Grid.Row="1">
             <CheckBox Content="Enabled"
                       IsChecked="{Binding CurrentFilterEnabled, Mode=TwoWay}"
                       VerticalAlignment="Center"
@@ -56,56 +77,93 @@
             <Button Content="Delete"
                     Command="{Binding DeleteFilterCommand}"
                     Margin="0,0,10,0" />
+            <Separator Margin="0,0,10,0" />
+            <Button Content="Export"
+                    Command="{Binding ExportFiltersCommand}"
+                    ToolTip="Export all loot filters to a JSON file"
+                    Margin="0,0,5,0" />
+            <Button Content="Import"
+                    Command="{Binding ImportFiltersCommand}"
+                    ToolTip="Import loot filters from a JSON file"
+                    Margin="0,0,10,0" />
+            <TextBlock Text="Color:"
+                       VerticalAlignment="Center"
+                       Margin="0,0,5,0" />
             <xctk:ColorPicker SelectedColor="{Binding CurrentFilterColor, Mode=TwoWay, Converter={StaticResource StringToColorConverter}}"
-                              ToolTip="Sets a default color for new entries on this filter."
-                              DisplayColorAndName="False"
-                              Width="100"
-                              Foreground="Black"
-                              BorderBrush="Black"
-                              BorderThickness="1" 
-                              VerticalAlignment="Center" />
-            <Button Content="Apply to All"
-                    Command="{Binding ApplyColorToAllEntriesCommand}"
-                    ToolTip="Apply current filter color to all entries"
-                    Margin="10,0,10,0" />
-        </StackPanel>
-
-        <!-- Row 1: Add new entry -->
-        <StackPanel Orientation="Horizontal"
-                    Margin="5"
-                    Grid.Row="1">
-            <ComboBox x:Name="ItemSelector"
-                      ItemsSource="{Binding FilteredItems, Mode=OneWay}"
-                      ScrollViewer.VerticalScrollBarVisibility="Auto"
-                      SelectedItem="{Binding SelectedItemToAdd, Mode=TwoWay}"
-                      DisplayMemberPath="Name"
-                      Width="400"
-                      Margin="0,0,10,0">
-                <ComboBox.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <VirtualizingStackPanel />
-                    </ItemsPanelTemplate>
-                </ComboBox.ItemsPanel>
-            </ComboBox>
-            <TextBox Text="{Binding ItemSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, Delay=300}"
-                     Width="200"
-                     Margin="0,0,10,0"
-                     VerticalAlignment="Center" />
-            <Button Content="Add"
-                    Command="{Binding AddEntryCommand}"
+                              DisplayColorAndName="True"
+                              Width="150"
+                              Margin="0,0,5,0" />
+            <Button Content="Apply Color to All"
+                    Command="{Binding ApplyColorToAllCommand}"
+                    ToolTip="Apply the selected color to all entries in this filter"
+                    VerticalAlignment="Center"
+                    Margin="0,0,5,0" />
+            <Button Content="{Binding ToggleAllButtonText}"
+                    Command="{Binding EnableAllEntriesCommand}"
+                    ToolTip="Toggle all entries enabled/disabled"
                     VerticalAlignment="Center" />
         </StackPanel>
 
-        <!-- Row 2: Entries grid with inline color‐picker -->
-        <DataGrid ItemsSource="{Binding Entries}"
+        <!-- Row 2: Add new entry and search -->
+        <StackPanel Orientation="Horizontal"
+                    Margin="5"
+                    Grid.Row="2"
+                    Visibility="{Binding CurrentFilterEnabled, Converter={StaticResource BoolToVis}}">
+            <Button Content="Add Item..."
+                    Command="{Binding OpenItemSelectorCommand}"
+                    Width="150"
+                    VerticalAlignment="Center"
+                    Margin="0,0,10,0"
+                    ToolTip="Open item selector dialog with search - selected item will be added automatically"/>
+            <TextBlock Text="Search:"
+                       VerticalAlignment="Center"
+                       Margin="0,0,5,0" />
+            <TextBox Text="{Binding EntrySearchText, UpdateSourceTrigger=PropertyChanged}"
+                     Width="200"
+                     VerticalAlignment="Center"
+                     Margin="0,0,10,0"
+                     ToolTip="Search entries by Item ID, Name, or Comment" />
+            <TextBlock Text="Max Items:"
+                       VerticalAlignment="Center"
+                       Margin="0,0,5,0" />
+            <TextBox Text="{Binding MaxDisplayItems, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                     Width="60"
+                     VerticalAlignment="Center"
+                     Margin="0,0,10,0"
+                     ToolTip="Maximum number of entries to display (minimum: 1)" />
+            <CheckBox Content="Show All"
+                      IsChecked="{Binding ShowAllEntries, Mode=TwoWay}"
+                      VerticalAlignment="Center"
+                      Margin="0,0,10,0"
+                      ToolTip="Show all entries (ignores max items limit)" />
+            <TextBlock Text="{Binding EntryCountText}"
+                       VerticalAlignment="Center"
+                       Margin="5,0,0,0"
+                       Foreground="Gray"
+                       FontSize="11" />
+        </StackPanel>
+
+        <!-- Row 3: Entries grid with inline color‐picker -->
+        <DataGrid x:Name="EntriesGrid"
+                  ItemsSource="{Binding FilteredEntries}"
                   AutoGenerateColumns="False"
-                  Grid.Row="2"
+                  Grid.Row="3"
                   Margin="5"
                   EnableRowVirtualization="True"
                   EnableColumnVirtualization="True"
                   ScrollViewer.CanContentScroll="True"
                   VirtualizingStackPanel.IsVirtualizing="True"
-                  VirtualizingStackPanel.VirtualizationMode="Recycling">
+                  VirtualizingStackPanel.VirtualizationMode="Recycling"
+                  KeyDown="EntriesGrid_KeyDown"
+                  Visibility="{Binding CurrentFilterEnabled, Converter={StaticResource BoolToVis}}">
+
+            <DataGrid.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Delete"
+                              Command="{Binding DeleteEntryCommand}"
+                              CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                </ContextMenu>
+            </DataGrid.ContextMenu>
 
             <DataGrid.Columns>
                 <DataGridCheckBoxColumn Header="Enabled"
@@ -147,20 +205,30 @@
                         <DataTemplate>
                             <Border Width="16"
                                     Height="16"
-                                    Background="{Binding Color, Converter={StaticResource StringToBrushConverter}}"
+                                    Background="{Binding ExplicitColor, Converter={StaticResource StringToBrushConverter}}"
                                     BorderBrush="Black"
                                     BorderThickness="1" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                     <DataGridTemplateColumn.CellEditingTemplate>
                         <DataTemplate>
-                            <xctk:ColorPicker SelectedColor="{Binding Color, Mode=TwoWay, Converter={StaticResource StringToColorConverter}}"
+                            <xctk:ColorPicker SelectedColor="{Binding ExplicitColor, Mode=TwoWay, Converter={StaticResource StringToColorConverter}}"
                                               DisplayColorAndName="True"
-                                              Width="150"
-                                            BorderBrush="Black"
-                                            BorderThickness="1" />
+                                              Width="150" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellEditingTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTemplateColumn Header="Delete" Width="60">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Content="X"
+                                    ToolTip="Delete entry"
+                                    Command="{Binding DataContext.RemoveEntryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding}"
+                                    Padding="2"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>

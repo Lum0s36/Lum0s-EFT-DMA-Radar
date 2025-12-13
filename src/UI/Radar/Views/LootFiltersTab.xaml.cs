@@ -26,8 +26,10 @@ SOFTWARE.
  *
 */
 
+using LoneEftDmaRadar.UI.Loot;
 using LoneEftDmaRadar.UI.Radar.ViewModels;
 using System.Windows.Controls;
+using System.Windows.Input;
 
 namespace LoneEftDmaRadar.UI.Radar.Views
 {
@@ -42,6 +44,18 @@ namespace LoneEftDmaRadar.UI.Radar.Views
         {
             InitializeComponent();
             DataContext = ViewModel = new LootFiltersViewModel(this);
+        }
+
+        private void EntriesGrid_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Delete)
+            {
+                if (EntriesGrid.SelectedItem is LootFilterEntry entry)
+                {
+                    ViewModel.DeleteEntry(entry);
+                    e.Handled = true;
+                }
+            }
         }
     }
 }

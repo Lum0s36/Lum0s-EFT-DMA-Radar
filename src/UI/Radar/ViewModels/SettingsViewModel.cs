@@ -26,18 +26,19 @@ SOFTWARE.
  *
 */
 
-using Collections.Pooled;
+using System;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
+using System.Text.Json;
+using System.Windows;
+using System.Windows.Input;
 using LoneEftDmaRadar.Tarkov;
 using LoneEftDmaRadar.Tarkov.GameWorld.Loot;
-using LoneEftDmaRadar.Tarkov.GameWorld.Quests;
 using LoneEftDmaRadar.UI.ColorPicker;
-using LoneEftDmaRadar.UI.Data;
-using LoneEftDmaRadar.UI.Hotkeys;
 using LoneEftDmaRadar.UI.Misc;
 using LoneEftDmaRadar.UI.Radar.Views;
 using LoneEftDmaRadar.UI.Skia;
-using System.Collections.ObjectModel;
-using System.Windows.Input;
 
 namespace LoneEftDmaRadar.UI.Radar.ViewModels
 {
@@ -47,26 +48,17 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
         public event PropertyChangedEventHandler PropertyChanged;
         private void OnPropertyChanged(string name) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-        public ICommand AboutUrlCommand { get; }
 
         public SettingsViewModel(SettingsTab parent)
         {
             _parent = parent ?? throw new ArgumentNullException(nameof(parent));
-            AboutUrlCommand = new SimpleCommand(OnAboutUrl);
             RestartRadarCommand = new SimpleCommand(OnRestartRadar);
-            OpenHotkeyManagerCommand = new SimpleCommand(OnOpenHotkeyManager);
             OpenColorPickerCommand = new SimpleCommand(OnOpenColorPicker);
             BackupConfigCommand = new SimpleCommand(OnBackupConfig);
             OpenConfigCommand = new SimpleCommand(OnOpenConfig);
-            InitializeContainers();
+            SetContainersGlobalCommand = new SimpleCommand(OnSetContainersGlobal);
+            SetContainerDistanceGlobalCommand = new SimpleCommand(OnSetContainerDistanceGlobal);
             SetScaleValues(UIScale);
-            parent.IsVisibleChanged += Parent_IsVisibleChanged;
-        }
-
-        private void OnAboutUrl()
-        {
-            const string url = "https://lone-dma.org/";
-            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
         }
 
         #region General Settings
@@ -74,37 +66,6 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
         public ICommand RestartRadarCommand { get; }
         private void OnRestartRadar() =>
             Memory.RestartRadar();
-
-        private bool _hotkeyManagerIsEnabled = true;
-        public bool HotkeyManagerIsEnabled
-        {
-            get => _hotkeyManagerIsEnabled;
-            set
-            {
-                if (_hotkeyManagerIsEnabled != value)
-                {
-                    _hotkeyManagerIsEnabled = value;
-                    OnPropertyChanged(nameof(HotkeyManagerIsEnabled));
-                }
-            }
-        }
-        public ICommand OpenHotkeyManagerCommand { get; }
-        private void OnOpenHotkeyManager()
-        {
-            HotkeyManagerIsEnabled = false;
-            try
-            {
-                var wnd = new HotkeyManagerWindow()
-                {
-                    Owner = MainWindow.Instance
-                };
-                wnd.ShowDialog();
-            }
-            finally
-            {
-                HotkeyManagerIsEnabled = true;
-            }
-        }
 
         private bool _colorPickerIsEnabled = true;
         public bool ColorPickerIsEnabled
@@ -147,7 +108,7 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                     MessageBox.Show(MainWindow.Instance, "Overwrite backup?", "Backup Config", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
                     return;
 
-                await File.WriteAllTextAsync(backupFile, JsonSerializer.Serialize(App.Config, App.JsonOptions));
+                await File.WriteAllTextAsync(backupFile, JsonSerializer.Serialize(App.Config, new JsonSerializerOptions { WriteIndented = true }));
                 MessageBox.Show(MainWindow.Instance, $"Backed up to {backupFile}", "Backup Config");
             }
             catch (Exception ex)
@@ -178,6 +139,19 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                 {
                     App.Config.UI.AimLineLength = value;
                     OnPropertyChanged(nameof(AimlineLength));
+                }
+            }
+        }
+
+        public int TeammateAimlineLength
+        {
+            get => App.Config.UI.TeammateAimlineLength;
+            set
+            {
+                if (App.Config.UI.TeammateAimlineLength != value)
+                {
+                    App.Config.UI.TeammateAimlineLength = value;
+                    OnPropertyChanged(nameof(TeammateAimlineLength));
                 }
             }
         }
@@ -232,42 +206,29 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
             SKPaints.PaintBoss.StrokeWidth = 1.66f * newScale;
             SKPaints.PaintFocused.StrokeWidth = 1.66f * newScale;
             SKPaints.PaintPScav.StrokeWidth = 1.66f * newScale;
-            SKPaints.PaintCorpse.StrokeWidth = 0.25f * newScale;
-            SKPaints.PaintMeds.StrokeWidth = 0.25f * newScale;
-            SKPaints.PaintFood.StrokeWidth = 0.25f * newScale;
-            SKPaints.PaintBackpacks.StrokeWidth = 0.25f * newScale;
-            SKPaints.PaintDeathMarker.StrokeWidth = 3f * newScale;
-            SKPaints.PaintLoot.StrokeWidth = 0.25f * newScale;
-            SKPaints.PaintImportantLoot.StrokeWidth = 0.25f * newScale;
-            SKPaints.PaintContainerLoot.StrokeWidth = 0.25f * newScale;
-            SKPaints.PaintTransparentBacker.StrokeWidth = 0.25f * newScale;
-            SKPaints.PaintExplosives.StrokeWidth = 3f * newScale;
-            SKPaints.PaintExfil.StrokeWidth = 0.25f * newScale;
-            SKPaints.PaintExfilTransit.StrokeWidth = 0.25f * newScale;
-            SKPaints.PaintQuestZone.StrokeWidth = 0.25f * newScale;
-            SKPaints.PaintQuestItem.StrokeWidth = 0.25f * newScale;
-            SKPaints.PaintWishlistItem.StrokeWidth = 0.25f * newScale;
+            SKPaints.PaintCorpse.StrokeWidth = 3 * newScale;
+            SKPaints.PaintMeds.StrokeWidth = 3 * newScale;
+            SKPaints.PaintFood.StrokeWidth = 3 * newScale;
+            SKPaints.PaintBackpacks.StrokeWidth = 3 * newScale;
+            SKPaints.PaintQuestItem.StrokeWidth = 3 * newScale;
+            SKPaints.PaintWishlistItem.StrokeWidth = 3 * newScale;
+            SKPaints.QuestHelperPaint.StrokeWidth = 3 * newScale;
+            SKPaints.PaintDeathMarker.StrokeWidth = 3 * newScale;
+            SKPaints.PaintLoot.StrokeWidth = 3 * newScale;
+            SKPaints.PaintImportantLoot.StrokeWidth = 3 * newScale;
+            SKPaints.PaintContainerLoot.StrokeWidth = 3 * newScale;
+            SKPaints.PaintTransparentBacker.StrokeWidth = 1 * newScale;
+            SKPaints.PaintExplosives.StrokeWidth = 3 * newScale;
+            SKPaints.PaintExfilOpen.StrokeWidth = 1 * newScale;
+            SKPaints.PaintExfilTransit.StrokeWidth = 1 * newScale;
             // Fonts
             SKFonts.UIRegular.Size = 12f * newScale;
             SKFonts.UILarge.Size = 48f * newScale;
             SKFonts.InfoWidgetFont.Size = 12f * newScale;
-            // FilteredLoot Paints
+            // Loot Paints
             LootItem.ScaleLootPaints(newScale);
 
             #endregion
-        }
-
-        public int ContainerDistance
-        {
-            get => (int)Math.Round(App.Config.Containers.DrawDistance);
-            set
-            {
-                if (App.Config.Containers.DrawDistance != value)
-                {
-                    App.Config.Containers.DrawDistance = value;
-                    OnPropertyChanged(nameof(ContainerDistance));
-                }
-            }
         }
 
         private bool _showMapSetupHelper;
@@ -314,6 +275,19 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
             }
         }
 
+        public bool LootInfoWidget
+        {
+            get => App.Config.LootInfoWidget.Enabled;
+            set
+            {
+                if (App.Config.LootInfoWidget.Enabled != value)
+                {
+                    App.Config.LootInfoWidget.Enabled = value;
+                    OnPropertyChanged(nameof(LootInfoWidget));
+                }
+            }
+        }
+
         public bool ConnectGroups
         {
             get => App.Config.UI.ConnectGroups;
@@ -340,15 +314,15 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
             }
         }
 
-        public bool ShowHazards
+        public bool ShowMines
         {
-            get => App.Config.UI.ShowHazards;
+            get => App.Config.UI.ShowMines;
             set
             {
-                if (App.Config.UI.ShowHazards != value)
+                if (App.Config.UI.ShowMines != value)
                 {
-                    App.Config.UI.ShowHazards = value;
-                    OnPropertyChanged(nameof(ShowHazards));
+                    App.Config.UI.ShowMines = value;
+                    OnPropertyChanged(nameof(ShowMines));
                 }
             }
         }
@@ -391,6 +365,23 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                 }
             }
         }
+        
+        public bool ShowESP
+        {
+            get => UI.ESP.ESPWindow.ShowESP;
+            set
+            {
+                if (UI.ESP.ESPWindow.ShowESP != value)
+                {
+                    if (value)
+                        UI.ESP.ESPManager.ShowESP();
+                    else
+                        UI.ESP.ESPManager.HideESP();
+                    
+                    OnPropertyChanged(nameof(ShowESP));
+                }
+            }
+        }
 
         public bool ShowLoot
         {
@@ -409,15 +400,28 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
             }
         }
 
-        public bool ShowExfils
+        public bool EspQuestLoot
         {
-            get => App.Config.UI.ShowExfils;
+            get => App.Config.UI.EspQuestLoot;
             set
             {
-                if (App.Config.UI.ShowExfils != value)
+                if (App.Config.UI.EspQuestLoot != value)
                 {
-                    App.Config.UI.ShowExfils = value;
-                    OnPropertyChanged(nameof(ShowExfils));
+                    App.Config.UI.EspQuestLoot = value;
+                    OnPropertyChanged(nameof(EspQuestLoot));
+                }
+            }
+        }
+
+        public int RadarMaxFPS
+        {
+            get => App.Config.UI.RadarMaxFPS;
+            set
+            {
+                if (App.Config.UI.RadarMaxFPS != value)
+                {
+                    App.Config.UI.RadarMaxFPS = value;
+                    OnPropertyChanged(nameof(RadarMaxFPS));
                 }
             }
         }
@@ -425,19 +429,6 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
         #endregion
 
         #region Loot
-
-        public bool LootWishlist
-        {
-            get => App.Config.Loot.ShowWishlist;
-            set
-            {
-                if (App.Config.Loot.ShowWishlist != value)
-                {
-                    App.Config.Loot.ShowWishlist = value;
-                    OnPropertyChanged(nameof(LootWishlist));
-                }
-            }
-        }
 
         public bool ShowStaticContainers
         {
@@ -452,76 +443,197 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
             }
         }
 
-        public bool StaticContainersSelectAll
+        public ICommand SetContainersGlobalCommand { get; }
+        private void OnSetContainersGlobal()
         {
-            get => App.Config.Containers.SelectAll;
+            // Set current Radar value to Aimview and ESP
+            bool value = App.Config.Containers.Enabled;
+            
+            // Update Aimview (same ViewModel - direct property update)
+            App.Config.AimviewWidget.ShowContainers = value;
+            OnPropertyChanged(nameof(AimviewShowContainers));
+            
+            // Update ESP (different ViewModel - need to notify)
+            App.Config.UI.EspContainers = value;
+            MainWindow.Instance?.EspSettings?.ViewModel?.NotifyPropertyChanged(nameof(EspSettingsViewModel.EspContainers));
+        }
+
+        public int ContainerDistance
+        {
+            get => (int)Math.Round(App.Config.Containers.DrawDistance);
             set
             {
-                if (App.Config.Containers.SelectAll != value)
+                if (App.Config.Containers.DrawDistance != value)
                 {
-                    App.Config.Containers.SelectAll = value;
-                    foreach (var item in StaticContainers) item.IsTracked = value;
-                    OnPropertyChanged(nameof(StaticContainersSelectAll));
+                    App.Config.Containers.DrawDistance = value;
+                    OnPropertyChanged(nameof(ContainerDistance));
                 }
             }
         }
 
-        private void InitializeContainers()
+        public ICommand SetContainerDistanceGlobalCommand { get; }
+        private void OnSetContainerDistanceGlobal()
         {
-            var entries = TarkovDataManager.AllContainers.Values
-                .OrderBy(x => x.Name)
-                .Select(x => new StaticContainerEntry(x));
-            foreach (var entry in entries)
-            {
-                StaticContainers.Add(entry);
-            }
+            // Set current Radar Container Distance to Aimview and ESP
+            float value = App.Config.Containers.DrawDistance;
+            
+            // Update Aimview (same ViewModel - direct property update)
+            App.Config.AimviewWidget.ContainerDistance = value;
+            OnPropertyChanged(nameof(AimviewContainerDistance));
+            
+            // Update ESP (different ViewModel - need to notify)
+            App.Config.Containers.EspDrawDistance = value;
+            MainWindow.Instance?.EspSettings?.ViewModel?.NotifyPropertyChanged(nameof(EspSettingsViewModel.EspContainerDistance));
         }
 
-        public ObservableCollection<StaticContainerEntry> StaticContainers { get; } = new();
-
-        public bool ContainerIsTracked(string id) => StaticContainers.Any(x => x.Id.Equals(id, StringComparison.OrdinalIgnoreCase) && x.IsTracked);
-
-        #endregion
-
-        #region Quest Helper
-
-        public ObservableCollection<QuestEntry> CurrentQuests { get; } = new();
-
-        public bool QuestHelperEnabled
+        public bool ShowCorpseMarkers
         {
-            get => App.Config.QuestHelper.Enabled;
+            get => App.Config.Loot.ShowCorpseMarkers;
             set
             {
-                if (App.Config.QuestHelper.Enabled != value)
+                if (App.Config.Loot.ShowCorpseMarkers != value)
                 {
-                    App.Config.QuestHelper.Enabled = value;
-                    OnPropertyChanged(nameof(QuestHelperEnabled));
-                }
-            }
-        }
-
-        private void Parent_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
-        {
-            if (e.NewValue is bool visible && visible &&
-                Memory.QuestManager?.Quests is IReadOnlyDictionary<string, QuestEntry> quests)
-            {
-                using var currentQuests = CurrentQuests.ToPooledList(); // snapshot
-                using var existingIds = new PooledSet<string>(currentQuests.Select(q => q.Id), StringComparer.OrdinalIgnoreCase);
-                using var newIds = new PooledSet<string>(quests.Keys, StringComparer.OrdinalIgnoreCase);
-
-                // remove stale
-                foreach (var q in currentQuests.Where(q => !newIds.Contains(q.Id)))
-                    CurrentQuests.Remove(q);
-
-                // add missing
-                foreach (var key in newIds)
-                {
-                    if (!existingIds.Contains(key) && quests.TryGetValue(key, out var newQuest))
-                        CurrentQuests.Add(newQuest);
+                    App.Config.Loot.ShowCorpseMarkers = value;
+                    OnPropertyChanged(nameof(ShowCorpseMarkers));
                 }
             }
         }
 
         #endregion
+
+        #region Aimview ESP
+
+        public bool AimviewShowLoot
+        {
+            get => App.Config.AimviewWidget.ShowLoot;
+            set
+            {
+                if (App.Config.AimviewWidget.ShowLoot != value)
+                {
+                    App.Config.AimviewWidget.ShowLoot = value;
+                    OnPropertyChanged(nameof(AimviewShowLoot));
+                }
+            }
+        }
+
+        public bool AimviewShowQuestItems
+        {
+            get => App.Config.AimviewWidget.ShowQuestItems;
+            set
+            {
+                if (App.Config.AimviewWidget.ShowQuestItems != value)
+                {
+                    App.Config.AimviewWidget.ShowQuestItems = value;
+                    OnPropertyChanged(nameof(AimviewShowQuestItems));
+                }
+            }
+        }
+
+        public bool AimviewShowAI
+        {
+            get => App.Config.AimviewWidget.ShowAI;
+            set
+            {
+                if (App.Config.AimviewWidget.ShowAI != value)
+                {
+                    App.Config.AimviewWidget.ShowAI = value;
+                    OnPropertyChanged(nameof(AimviewShowAI));
+                }
+            }
+        }
+
+        public bool AimviewShowEnemyPlayers
+        {
+            get => App.Config.AimviewWidget.ShowEnemyPlayers;
+            set
+            {
+                if (App.Config.AimviewWidget.ShowEnemyPlayers != value)
+                {
+                    App.Config.AimviewWidget.ShowEnemyPlayers = value;
+                    OnPropertyChanged(nameof(AimviewShowEnemyPlayers));
+                }
+            }
+        }
+
+        public bool AimviewShowWishlisted
+        {
+            get => App.Config.AimviewWidget.ShowWishlisted;
+            set
+            {
+                if (App.Config.AimviewWidget.ShowWishlisted != value)
+                {
+                    App.Config.AimviewWidget.ShowWishlisted = value;
+                    OnPropertyChanged(nameof(AimviewShowWishlisted));
+                }
+            }
+        }
+
+        public bool AimviewShowContainers
+        {
+            get => App.Config.AimviewWidget.ShowContainers;
+            set
+            {
+                if (App.Config.AimviewWidget.ShowContainers != value)
+                {
+                    App.Config.AimviewWidget.ShowContainers = value;
+                    OnPropertyChanged(nameof(AimviewShowContainers));
+                }
+            }
+        }
+
+        public float AimviewLootRenderDistance
+        {
+            get => App.Config.UI.AimviewLootRenderDistance;
+            set
+            {
+                if (Math.Abs(App.Config.UI.AimviewLootRenderDistance - value) > float.Epsilon)
+                {
+                    App.Config.UI.AimviewLootRenderDistance = value;
+                    OnPropertyChanged(nameof(AimviewLootRenderDistance));
+                }
+            }
+        }
+
+        public float AimviewContainerDistance
+        {
+            get => App.Config.AimviewWidget.ContainerDistance;
+            set
+            {
+                if (Math.Abs(App.Config.AimviewWidget.ContainerDistance - value) > float.Epsilon)
+                {
+                    App.Config.AimviewWidget.ContainerDistance = value;
+                    OnPropertyChanged(nameof(AimviewContainerDistance));
+                }
+            }
+        }
+
+        public bool AimviewShowHeadCircle
+        {
+            get => App.Config.AimviewWidget.ShowHeadCircle;
+            set
+            {
+                if (App.Config.AimviewWidget.ShowHeadCircle != value)
+                {
+                    App.Config.AimviewWidget.ShowHeadCircle = value;
+                    OnPropertyChanged(nameof(AimviewShowHeadCircle));
+                }
+            }
+        }
+
+        public bool AimviewShowExfils
+        {
+            get => App.Config.AimviewWidget.ShowExfils;
+            set
+            {
+                if (App.Config.AimviewWidget.ShowExfils != value)
+                {
+                    App.Config.AimviewWidget.ShowExfils = value;
+                    OnPropertyChanged(nameof(AimviewShowExfils));
+                }
+            }
+        }
+
+        #endregion
+
     }
 }

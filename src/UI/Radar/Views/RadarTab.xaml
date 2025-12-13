@@ -14,6 +14,7 @@
         <d:DesignInstance Type="{x:Type vm:RadarViewModel}"
                           IsDesignTimeCreatable="False" />
     </d:UserControl.DataContext>
+
     <Grid>
         <skia:SKGLElement x:Name="Radar"
                           RenderContinuously="True"

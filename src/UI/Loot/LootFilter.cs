@@ -31,7 +31,7 @@ using LoneEftDmaRadar.Tarkov.GameWorld.Loot;
 namespace LoneEftDmaRadar.UI.Loot
 {
     /// <summary>
-    /// Enumerable FilteredLoot Filter Class.
+    /// Enumerable Loot Filter Class.
     /// </summary>
     internal static class LootFilter
     {
@@ -39,49 +39,84 @@ namespace LoneEftDmaRadar.UI.Loot
         public static bool ShowMeds;
         public static bool ShowFood;
         public static bool ShowBackpacks;
-        public static bool ShowQuestItems;
+        public static bool ShowQuestItems; // respect config via UI binding when set
 
         /// <summary>
-        /// Creates a loot filter based on current FilteredLoot Filter settings.
+        /// Creates a loot filter based on current Loot Filter settings.
         /// </summary>
-        /// <returns>FilteredLoot Filter Predicate.</returns>
+        /// <returns>Loot Filter Predicate.</returns>
         public static Predicate<LootItem> Create()
         {
             var search = SearchString?.Trim();
             bool usePrices = string.IsNullOrEmpty(search);
+            bool showMeds = ShowMeds;
+            bool showFood = ShowFood;
+            bool showBackpacks = ShowBackpacks;
+            bool showQuestItems = ShowQuestItems;
+            bool showWishlisted = App.Config.Loot.ShowWishlistedRadar;
+            
             if (usePrices)
             {
-                Predicate<LootItem> p = item => // Default Predicate
+                Predicate<LootItem> p = x => // Default Predicate
                 {
-                    if (App.Config.QuestHelper.Enabled && item.IsQuestHelperItem)
+                    if (x.IsQuestItem && showQuestItems)
                         return true;
-                    if (item is LootAirdrop)
+                    // Wishlist items always pass the filter when enabled
+                    if (showWishlisted && x.IsWishlisted)
                         return true;
-                    if (!App.Config.Loot.HideCorpses && item is LootCorpse)
-                        return true;
-                    return (item.IsRegularLoot || item.IsValuableLoot || item.IsImportant || item.IsWishlisted) ||
-                                (ShowBackpacks && item.IsBackpack) ||
-                                (ShowMeds && item.IsMeds) ||
-                                (ShowFood && item.IsFood) ||
-                                (ShowQuestItems && item.IsQuestItem);
+                    return (x.IsRegularLoot || x.IsValuableLoot || x.IsImportant) ||
+                                (showBackpacks && x.IsBackpack) ||
+                                (showMeds && x.IsMeds) ||
+                                (showFood && x.IsFood);
                 };
                 return item =>
                 {
-                    return p(item);
+                    if (item is LootAirdrop)
+                    {
+                        return true;
+                    }
+                    if (item is LootCorpse)
+                    {
+                        return true;
+                    }
+                    if (item is StaticLootContainer container)
+                    {
+                        // Show if SelectAll is enabled OR if this specific container is selected
+                        return App.Config.Containers.SelectAll || App.Config.Containers.Selected.ContainsKey(container.ID);
+                    }
+                    if (p(item))
+                    {
+                        return true;
+                    }
+                    return false;
                 };
             }
-            else // FilteredLoot Search
+            else // Loot Search
             {
                 var names = search!.Split(',').Select(a => a.Trim()).ToList(); // Pooled wasnt working well here
-                Predicate<LootItem> p = item => // Search Predicate
+                Predicate<LootItem> p = x => // Search Predicate
                 {
-                    if (item is LootAirdrop)
+                    // Wishlist items also show during search when enabled
+                    if (showWishlisted && x.IsWishlisted)
                         return true;
-                    return names.Any(a => item.Name.Contains(a, StringComparison.OrdinalIgnoreCase));
+                    return names.Any(a => x.Name.Contains(a, StringComparison.OrdinalIgnoreCase));
                 };
                 return item =>
                 {
-                    return p(item);
+                    if (item is LootAirdrop)
+                    {
+                        return true;
+                    }
+                    if (item is StaticLootContainer container)
+                    {
+                        // Show if SelectAll is enabled OR if this specific container is selected
+                        return App.Config.Containers.SelectAll || App.Config.Containers.Selected.ContainsKey(container.ID);
+                    }
+                    if (item.ContainsSearchPredicate(p))
+                    {
+                        return true;
+                    }
+                    return false;
                 };
             }
         }

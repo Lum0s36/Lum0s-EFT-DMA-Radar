@@ -78,5 +78,23 @@ namespace LoneEftDmaRadar.UI.Data
         [JsonInclude]
         [JsonPropertyName("timestamp")]
         public DateTime Timestamp { get; init; } = DateTime.Now;
+
+        private bool _streamer;
+        /// <summary>
+        /// True if the player is a streamer.
+        /// </summary>
+        [JsonPropertyName("streamer")]
+        public bool Streamer
+        {
+            get => _streamer;
+            set
+            {
+                if (_streamer != value)
+                {
+                    _streamer = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
     }
 }

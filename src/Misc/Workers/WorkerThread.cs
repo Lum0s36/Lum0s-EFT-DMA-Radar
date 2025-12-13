@@ -26,6 +26,8 @@ SOFTWARE.
  *
 */
 
+using LoneEftDmaRadar.UI.Misc;
+
 namespace LoneEftDmaRadar.Misc.Workers
 {
     public sealed class WorkerThread : IDisposable
@@ -91,7 +93,7 @@ namespace LoneEftDmaRadar.Misc.Workers
 
         private void Worker()
         {
-            Debug.WriteLine($"[WorkerThread] '{Name}' thread starting...");
+            DebugLogger.LogDebug($"[WorkerThread] '{Name}' thread starting...");
             bool shouldSleep = SleepDuration > TimeSpan.Zero;
             bool shouldDynamicSleep = shouldSleep && SleepMode == WorkerThreadSleepMode.DynamicSleep;
             while (!_disposed)
@@ -104,7 +106,7 @@ namespace LoneEftDmaRadar.Misc.Workers
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[WorkerThread] WARNING: Unhandled exception on '{Name}' thread: {ex}");
+                    DebugLogger.LogDebug($"[WorkerThread] WARNING: Unhandled exception on '{Name}' thread: {ex}");
                 }
                 finally
                 {
@@ -123,7 +125,7 @@ namespace LoneEftDmaRadar.Misc.Workers
                     }
                 }
             }
-            Debug.WriteLine($"[WorkerThread] '{Name}' thread stopping...");
+            DebugLogger.LogDebug($"[WorkerThread] '{Name}' thread stopping...");
         }
 
         #region IDisposable

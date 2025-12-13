@@ -14,6 +14,22 @@
     </d:UserControl.DataContext>
 
     <Grid Margin="5">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Collapsing header for adding players from current raid -->
+        <Expander Header="Players in current raid" IsExpanded="False" Grid.Row="0" Margin="0,0,0,10">
+            <StackPanel Orientation="Horizontal">
+                <ComboBox ItemsSource="{Binding RaidPlayers}" SelectedItem="{Binding SelectedRaidPlayerId}" Width="200" Margin="0,0,8,0" />
+                <TextBox Text="{Binding ReasonInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="200" Margin="0,0,8,0" />
+                <CheckBox Content="Streamer" IsChecked="{Binding IsStreamerInput}" Margin="0,0,8,0" />
+                <Button Content="Add" Command="{Binding AddSelectedRaidPlayerCommand}" Margin="0,0,8,0" />
+                <Button Content="Refresh" Command="{Binding RefreshRaidPlayersCommand}" />
+            </StackPanel>
+        </Expander>
+
         <DataGrid ItemsSource="{Binding Entries}"
                   SelectedItem="{Binding SelectedEntry, Mode=TwoWay}"
                   AutoGenerateColumns="False"
@@ -23,13 +39,15 @@
                   EnableColumnVirtualization="True"
                   ScrollViewer.CanContentScroll="True"
                   VirtualizingStackPanel.IsVirtualizing="True"
-                  VirtualizingStackPanel.VirtualizationMode="Recycling">
+                  VirtualizingStackPanel.VirtualizationMode="Recycling"
+                  Grid.Row="1">
 
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Account ID"
                                     Binding="{Binding AcctID, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                 <DataGridTextColumn Header="Reason"
                                     Binding="{Binding Reason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                <DataGridCheckBoxColumn Header="Streamer" Binding="{Binding Streamer, Mode=TwoWay}" />
                 <DataGridTextColumn Header="Timestamp"
                                     Binding="{Binding Timestamp, StringFormat={}{0:g}}"
                                     IsReadOnly="True" />

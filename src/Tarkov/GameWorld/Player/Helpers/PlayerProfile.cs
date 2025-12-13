@@ -26,6 +26,7 @@ SOFTWARE.
  *
 */
 
+using LoneEftDmaRadar.UI.Misc;
 using LoneEftDmaRadar.Web.ProfileApi.Schema;
 using LoneEftDmaRadar.Web.Twitch;
 
@@ -94,7 +95,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player.Helpers
             // --- Level ---
             var xp = Data?.Info?.Experience;
             if (xp.HasValue)
-                Level = TarkovDataManager.XPTable
+                Level = StaticGameData.XPTable
                     .Where(x => x.Key > xp.Value)
                     .Select(x => x.Value)
                     .FirstOrDefault() - 1;
@@ -127,7 +128,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player.Helpers
                 _player.IsFocused = true;
             }
             else if (Hours is int hrs && hrs < 30 &&
-                    !IsEOD && !IsUnheard) // Low hours played on std account, could be a brand new cheater account
+                     !IsUnheard && !IsEOD) // Low hours played on std account, could be a brand new cheater account
             {
                 _player.IsFocused = true;
             }
@@ -170,7 +171,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player.Helpers
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"ERROR updating Member Category for '{Name}': {ex}");
+                DebugLogger.LogDebug($"ERROR updating Member Category for '{Name}': {ex}");
             }
         }
 

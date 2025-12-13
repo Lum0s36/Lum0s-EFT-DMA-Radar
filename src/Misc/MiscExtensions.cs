@@ -35,7 +35,7 @@ namespace LoneEftDmaRadar.Misc
     /// </summary>
     public static class MiscExtensions
     {
-        private static readonly JsonSerializerOptions _noIndents = new() // DONT REMOVE THIS OPTIONS INSTANCE!!!
+        private static readonly JsonSerializerOptions _noIndents = new()
         {
             WriteIndented = false
         };

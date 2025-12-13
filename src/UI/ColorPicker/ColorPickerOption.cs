@@ -33,6 +33,8 @@ namespace LoneEftDmaRadar.UI.ColorPicker
         LocalPlayer,
         FriendlyPlayer,
         PMCPlayer,
+        PMCBear,
+        PMCUsec,
         WatchlistPlayer,
         StreamerPlayer,
         HumanScavPlayer,
@@ -42,14 +44,14 @@ namespace LoneEftDmaRadar.UI.ColorPicker
         FocusedPlayer,
         DeathMarker,
         RegularLoot,
-        ValuableLoot, // Formerly ImportantLoot
+        ValuableLoot,
         WishlistLoot,
         ContainerLoot,
         MedsFilterLoot,
         FoodFilterLoot,
         BackpacksFilterLoot,
-        QuestHelperItems,
-        QuestHelperZones,
+        QuestLoot,
+        StaticQuestItemsAndZones,
         Corpse,
         Explosives
     }

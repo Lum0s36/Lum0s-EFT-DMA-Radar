@@ -30,6 +30,7 @@ using LoneEftDmaRadar.Misc.Services;
 using LoneEftDmaRadar.Tarkov.GameWorld.Player.Helpers;
 using LoneEftDmaRadar.Tarkov.Unity.Collections;
 using LoneEftDmaRadar.Tarkov.Unity.Structures;
+using LoneEftDmaRadar.UI.Misc;
 using LoneEftDmaRadar.UI.Radar.ViewModels;
 using LoneEftDmaRadar.Web.ProfileApi;
 using LoneEftDmaRadar.Web.ProfileApi.Schema;
@@ -165,14 +166,10 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player
             var localPlayer = Memory.LocalPlayer;
             ArgumentNullException.ThrowIfNull(localPlayer, nameof(localPlayer));
             ObservedPlayerController = Memory.ReadPtr(this + Offsets.ObservedPlayerView.ObservedPlayerController);
-            ArgumentOutOfRangeException.ThrowIfNotEqual(this,
-                Memory.ReadValue<ulong>(ObservedPlayerController + Offsets.ObservedPlayerController.PlayerView),
-                nameof(ObservedPlayerController));
+            ArgumentOutOfRangeException.ThrowIfNotEqual(this, Memory.ReadValue<ulong>(ObservedPlayerController + Offsets.ObservedPlayerController.PlayerView), nameof(ObservedPlayerController));
             InventoryControllerAddr = ObservedPlayerController + Offsets.ObservedPlayerController.InventoryController;
             ObservedHealthController = Memory.ReadPtr(ObservedPlayerController + Offsets.ObservedPlayerController.HealthController);
-            ArgumentOutOfRangeException.ThrowIfNotEqual(this,
-                Memory.ReadValue<ulong>(ObservedHealthController + Offsets.ObservedHealthController._player),
-                nameof(ObservedHealthController));
+            ArgumentOutOfRangeException.ThrowIfNotEqual(this, Memory.ReadValue<ulong>(ObservedHealthController + Offsets.ObservedHealthController._player), nameof(ObservedHealthController));
             CorpseAddr = ObservedHealthController + Offsets.ObservedHealthController._playerCorpse;
 
             MovementContext = GetMovementContext();
@@ -180,7 +177,10 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player
             /// Setup Transform
             var ti = Memory.ReadPtrChain(this, false, _transformInternalChain);
             SkeletonRoot = new UnityTransform(ti);
-            _ = SkeletonRoot.UpdatePosition();
+            var initialPos = SkeletonRoot.UpdatePosition();
+            SetupBones();
+            // Initialize cached position for fallback (in case skeleton updates fail later)
+            _cachedPosition = initialPos;
 
             bool isAI = Memory.ReadValue<bool>(this + Offsets.ObservedPlayerView.IsAI);
             IsHuman = !isAI;
@@ -196,7 +196,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player
                 if (isAI)
                 {
                     var voicePtr = Memory.ReadPtr(this + Offsets.ObservedPlayerView.Voice);
-                    string voice = Memory.ReadUnityString(voicePtr);
+                    string voice = Memory.ReadUnicodeString(voicePtr);
                     var role = GetAIRoleInfo(voice);
                     Name = role.Name;
                     Type = role.Type;
@@ -228,7 +228,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player
                     {
                         var profileData = dto.ToProfileData();
                         Profile.Data = profileData;
-                        Debug.WriteLine($"[ObservedPlayer] Got Profile (Cached) '{acctIdLong}'!");
+                        DebugLogger.LogDebug($"[ObservedPlayer] Got Profile (Cached) '{acctIdLong}'!");
                     }
                     catch
                     {
@@ -247,7 +247,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player
                 if (MainWindow.Instance?.PlayerWatchlist?.ViewModel is PlayerWatchlistViewModel vm &&
                     vm.Watchlist.TryGetValue(AccountID, out var watchlistEntry)) // player is on watchlist
                 {
-                    Type = PlayerType.SpecialPlayer; // Flag watchlist player
+                    Type = watchlistEntry.Streamer ? PlayerType.Streamer : PlayerType.SpecialPlayer; // Flag watchlist player
                     UpdateAlerts($"[Watchlist] {watchlistEntry.Reason} @ {watchlistEntry.Timestamp}");
                 }
             }
@@ -263,7 +263,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player
             if (!IsHuman)
                 return "AI";
             var idPTR = Memory.ReadPtr(this + Offsets.ObservedPlayerView.AccountId);
-            return Memory.ReadUnityString(idPTR);
+            return Memory.ReadUnicodeString(idPTR);
         }
 
         /// <summary>
@@ -274,7 +274,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player
             try
             {
                 var groupIdPtr = Memory.ReadPtr(this + Offsets.ObservedPlayerView.GroupID);
-                string groupId = Memory.ReadUnityString(groupIdPtr);
+                string groupId = Memory.ReadUnicodeString(groupIdPtr);
                 return _groups.GetOrAdd(
                     groupId,
                     _ => Interlocked.Increment(ref _lastGroupNumber));
@@ -287,12 +287,62 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player
         /// </summary>
         private ulong GetMovementContext()
         {
-            var movementController = Memory.ReadPtrChain(ObservedPlayerController, true, Offsets.ObservedPlayerController.MovementController, Offsets.ObservedPlayerMovementController.ObservedPlayerStateContext);
+            var movementController = Memory.ReadPtrChain(ObservedPlayerController, true, Offsets.ObservedPlayerController.MovementController, Offsets.ObservedMovementController.ObservedPlayerStateContext);
             return movementController;
         }
 
+        private void SetupBones()
+        {
+            var bonesToRegister = new[]
+            {
+                Bones.HumanHead,
+                Bones.HumanNeck,
+                Bones.HumanSpine3,
+                Bones.HumanSpine2,
+                Bones.HumanSpine1,
+                Bones.HumanPelvis,
+                Bones.HumanLUpperarm,
+                Bones.HumanLForearm1,
+                Bones.HumanLForearm2,
+                Bones.HumanLPalm,
+                Bones.HumanRUpperarm,
+                Bones.HumanRForearm1,
+                Bones.HumanRForearm2,
+                Bones.HumanRPalm,
+                Bones.HumanLThigh1,
+                Bones.HumanLThigh2,
+                Bones.HumanLCalf,
+                Bones.HumanLFoot,
+                Bones.HumanRThigh1,
+                Bones.HumanRThigh2,
+                Bones.HumanRCalf,
+                Bones.HumanRFoot
+            };
+
+            foreach (var bone in bonesToRegister)
+            {
+                try
+                {
+                    var chain = _transformInternalChain.ToArray();
+                    chain[chain.Length - 2] = UnityList<byte>.ArrStartOffset + (uint)bone * 0x8;
+                    
+                    var ti = Memory.ReadPtrChain(this, false, chain);
+                    var transform = new UnityTransform(ti);
+                    PlayerBones.TryAdd(bone, transform);
+                }
+                catch { }
+            }
+            
+            if (PlayerBones.Count > 0)
+            {
+                 _verticesCount = PlayerBones.Values.Max(x => x.Count);
+                 _verticesCount = Math.Max(_verticesCount, SkeletonRoot.Count);
+            }
+            Skeleton = new PlayerSkeleton(SkeletonRoot, PlayerBones);
+        }
+
         /// <summary>
-        /// Sync Player Information.
+        /// Refresh Player Information.
         /// </summary>
         public override void OnRegRefresh(VmmScatter scatter, ISet<ulong> registered, bool? isActiveParam = null)
         {
@@ -325,7 +375,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"ERROR updating Health Status for '{Name}': {ex}");
+                DebugLogger.LogDebug($"ERROR updating Health Status for '{Name}': {ex}");
             }
         }
 

@@ -1,0 +1,305 @@
+<UserControl x:Class="LoneEftDmaRadar.UI.Radar.Views.MemWritesTab"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:LoneEftDmaRadar.UI.Radar.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             Padding="10">
+    <d:UserControl.DataContext>
+        <d:DesignInstance Type="{x:Type vm:MemWritesViewModel}" IsDesignTimeCreatable="False" />
+    </d:UserControl.DataContext>
+
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="CardBackgroundBrush" Color="#11151F" />
+        <SolidColorBrush x:Key="CardBorderBrush" Color="#1F2532" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#5DA8FF" />
+        <SolidColorBrush x:Key="WarningBrush" Color="#F3B04D" />
+        <SolidColorBrush x:Key="DangerBrush" Color="#EF596F" />
+        <SolidColorBrush x:Key="ForegroundBrush" Color="#E6EDF3" />
+        <SolidColorBrush x:Key="MutedBrush" Color="#9BA7B6" />
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Orientation="Vertical" Margin="0,0,0,10">
+
+            <!-- Critical Warning -->
+            <Border Background="{StaticResource CardBackgroundBrush}"
+                    BorderBrush="{StaticResource DangerBrush}"
+                    BorderThickness="1"
+                    CornerRadius="10"
+                    Padding="12"
+                    Margin="0,0,0,12">
+                <DockPanel>
+                    <Border Background="{StaticResource DangerBrush}"
+                            Width="4"
+                            CornerRadius="4"
+                            DockPanel.Dock="Left" />
+                    <StackPanel Margin="12,0,0,0">
+                        <TextBlock Text="Memory writes are high risk"
+                                   FontWeight="SemiBold"
+                                   FontSize="16"
+                                   Foreground="{StaticResource ForegroundBrush}" />
+                        <TextBlock TextWrapping="Wrap"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Margin="0,6,0,0">
+                            These features modify game memory directly and are easy to flag. Bans are likely if detected.
+                        </TextBlock>
+                        <TextBlock TextWrapping="Wrap"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Margin="0,6,0,0">
+                            Proceed only if you accept that risk and understand this does not mimic normal player behavior.
+                        </TextBlock>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!-- Master Enable -->
+            <GroupBox Header="Master Control" Margin="0,0,0,12">
+                <Border Background="{StaticResource CardBackgroundBrush}"
+                        BorderBrush="{StaticResource CardBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="10"
+                        Padding="12">
+                    <StackPanel>
+                        <CheckBox Content="Enable Memory Writes"
+                                  IsChecked="{Binding Enabled, Mode=TwoWay}"
+                                  FontWeight="SemiBold"
+                                  FontSize="14"
+                                  Foreground="{StaticResource ForegroundBrush}"
+                                  Margin="0,0,0,10" />
+
+                        <TextBlock Text="This master switch must be on for any memory write feature to run."
+                                   TextWrapping="Wrap"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   FontSize="12"
+                                   Margin="0,0,0,4" />
+
+                        <TextBlock Text="Turning it off disables every option below."
+                                   TextWrapping="Wrap"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   FontSize="12" />
+                    </StackPanel>
+                </Border>
+            </GroupBox>
+
+            <UniformGrid Columns="2" Rows="0" Margin="0,0,0,12">
+
+                <!-- Silent Aim -->
+                <GroupBox Header="Silent Aim" Margin="0,0,12,12">
+                    <Border Background="{StaticResource CardBackgroundBrush}"
+                            BorderBrush="{StaticResource CardBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="12">
+                        <StackPanel IsEnabled="{Binding Enabled}">
+                            <CheckBox Content="Enable Silent Aim"
+                                      IsChecked="{Binding MemoryAimEnabled, Mode=TwoWay}"
+                                      FontWeight="SemiBold"
+                                      Foreground="{StaticResource ForegroundBrush}"
+                                      Margin="0,0,0,10" />
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <TextBlock Text="Target bone:"
+                                           VerticalAlignment="Center"
+                                           Foreground="{StaticResource ForegroundBrush}"
+                                           Margin="0,0,8,0" />
+                                <ComboBox ItemsSource="{Binding AvailableBones}"
+                                          SelectedItem="{Binding MemoryAimTargetBone, Mode=TwoWay}"
+                                          Width="200" />
+                            </StackPanel>
+
+                            <TextBlock Text="Writes shot direction in memory instead of moving the mouse."
+                                       TextWrapping="Wrap"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       FontSize="12"
+                                       Margin="0,0,0,6" />
+
+                            <TextBlock Text="Shares the same aim key as Device Aimbot and does not require a Device Aimbot device."
+                                   TextWrapping="Wrap"
+                                   Foreground="{StaticResource ForegroundBrush}"
+                                   FontSize="12"
+                                   Margin="0,0,0,10" />
+
+                            <Border Background="#151C29"
+                                    BorderBrush="{StaticResource CardBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="10"
+                                    Margin="0,6,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="How it works"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource AccentBrush}" />
+                                    <TextBlock TextWrapping="Wrap"
+                                               Foreground="{StaticResource MutedBrush}"
+                                               FontSize="12"
+                                               Margin="0,4,0,0">
+                                        - Hold the aim key to calculate direction to the current target.
+                                        - The calculated vector is written directly to memory.
+                                        - Bullets follow that vector without any mouse movement.
+                                        - All Device Aimbot settings (FOV, prediction, filters) still apply.
+                                    </TextBlock>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Background="#1A1618"
+                                    BorderBrush="{StaticResource DangerBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="10"
+                                    Margin="0,10,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="Detection risk: very high"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource DangerBrush}" />
+                                    <TextBlock Text="Silent aim behavior is extremely obvious to anti-cheat systems."
+                                               TextWrapping="Wrap"
+                                               Foreground="{StaticResource MutedBrush}"
+                                               FontSize="12"
+                                               Margin="0,4,0,0" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                </GroupBox>
+
+                <!-- No Recoil -->
+                <GroupBox Header="No Recoil" Margin="0,0,12,12">
+                    <Border Background="{StaticResource CardBackgroundBrush}"
+                            BorderBrush="{StaticResource CardBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="12">
+                        <StackPanel IsEnabled="{Binding Enabled}">
+                            <CheckBox Content="Enable No Recoil"
+                                      IsChecked="{Binding NoRecoilEnabled, Mode=TwoWay}"
+                                      FontWeight="SemiBold"
+                                      Foreground="{StaticResource ForegroundBrush}"
+                                      Margin="0,0,0,10" />
+
+                            <TextBlock Text="Adjust recoil and sway written into memory. 100% removes recoil; 0% keeps it stock."
+                                       TextWrapping="Wrap"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       FontSize="12"
+                                       Margin="0,0,0,10" />
+
+                            <!-- Recoil Amount -->
+                            <StackPanel Margin="0,6,0,0" IsEnabled="{Binding NoRecoilEnabled}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="160" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Recoil reduction"
+                                               Foreground="{StaticResource ForegroundBrush}" />
+                                    <TextBlock Text="{Binding NoRecoilAmount, StringFormat='{}{0:F0}%'}"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource AccentBrush}"
+                                               Grid.Column="1"
+                                               HorizontalAlignment="Right" />
+                                </Grid>
+                                <Slider Value="{Binding NoRecoilAmount, Mode=TwoWay}"
+                                        Minimum="0"
+                                        Maximum="100"
+                                        TickFrequency="5"
+                                        IsSnapToTickEnabled="True"
+                                        Margin="0,6,0,0" />
+                            </StackPanel>
+
+                            <!-- Sway Amount -->
+                            <StackPanel Margin="0,12,0,0" IsEnabled="{Binding NoRecoilEnabled}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="160" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Sway reduction"
+                                               Foreground="{StaticResource ForegroundBrush}" />
+                                    <TextBlock Text="{Binding NoSwayAmount, StringFormat='{}{0:F0}%'}"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource AccentBrush}"
+                                               Grid.Column="1"
+                                               HorizontalAlignment="Right" />
+                                </Grid>
+                                <Slider Value="{Binding NoSwayAmount, Mode=TwoWay}"
+                                        Minimum="0"
+                                        Maximum="100"
+                                        TickFrequency="5"
+                                        IsSnapToTickEnabled="True"
+                                        Margin="0,6,0,0" />
+                            </StackPanel>
+
+                            <Border Background="#1A1618"
+                                    BorderBrush="{StaticResource WarningBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="10"
+                                    Margin="0,12,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="Detection risk: high"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource WarningBrush}" />
+                                    <TextBlock Text="Directly changes weapon behavior in memory and is simple to flag."
+                                               TextWrapping="Wrap"
+                                               Foreground="{StaticResource MutedBrush}"
+                                               FontSize="12"
+                                               Margin="0,4,0,0" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                </GroupBox>
+
+                <!-- Infinite Stamina -->
+                <GroupBox Header="Infinite Stamina" Margin="0,0,12,12">
+                    <Border Background="{StaticResource CardBackgroundBrush}"
+                            BorderBrush="{StaticResource CardBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="12">
+                        <StackPanel IsEnabled="{Binding Enabled}">
+                            <CheckBox Content="Enable Infinite Stamina"
+                                      IsChecked="{Binding InfiniteStaminaEnabled, Mode=TwoWay}"
+                                      FontWeight="SemiBold"
+                                      Foreground="{StaticResource ForegroundBrush}"
+                                      Margin="0,0,0,10" />
+
+                            <TextBlock Text="Refills stamina and oxygen when they drop below roughly one-third."
+                                       TextWrapping="Wrap"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       FontSize="12"
+                                       Margin="0,0,0,6" />
+
+                            <TextBlock Text="Also attempts to bypass fatigue states to avoid movement penalties."
+                                       TextWrapping="Wrap"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       FontSize="12"
+                                       Margin="0,0,0,10" />
+
+                            <Border Background="#1A1618"
+                                    BorderBrush="{StaticResource WarningBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="10"
+                                    Margin="0,6,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="Detection risk: medium"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource WarningBrush}" />
+                                    <TextBlock Text="Player stat changes are less blatant than recoil removal but remain detectable."
+                                               TextWrapping="Wrap"
+                                               Foreground="{StaticResource MutedBrush}"
+                                               FontSize="12"
+                                               Margin="0,4,0,0" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                </GroupBox>
+
+            </UniformGrid>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

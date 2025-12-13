@@ -1,7 +1,7 @@
-﻿/*
+/*
  * Lone EFT DMA Radar
  * Brought to you by Lone (Lone DMA)
- * 
+ *
 MIT License
 
 Copyright (c) 2025 Lone DMA
@@ -27,6 +27,7 @@ SOFTWARE.
 */
 
 using Collections.Pooled;
+using LoneEftDmaRadar.DMA;
 
 namespace LoneEftDmaRadar.Tarkov.Unity.Collections
 {
@@ -40,7 +41,7 @@ namespace LoneEftDmaRadar.Tarkov.Unity.Collections
         where TKey : unmanaged
         where TValue : unmanaged
     {
-        public const uint CountOffset = 0x20;
+        public const uint CountOffset = 0x40;
         public const uint EntriesOffset = 0x18;
         public const uint EntriesStartOffset = 0x20;
 
@@ -55,7 +56,7 @@ namespace LoneEftDmaRadar.Tarkov.Unity.Collections
         /// <returns></returns>
         public static UnityDictionary<TKey, TValue> Create(ulong addr, bool useCache = true)
         {
-            var count = LoneEftDmaRadar.DMA.Memory.ReadValue<int>(addr + CountOffset, useCache);
+            var count = MemoryInterface.Memory.ReadValue<int>(addr + CountOffset, useCache);
             ArgumentOutOfRangeException.ThrowIfGreaterThan(count, 16384, nameof(count));
             var dict = new UnityDictionary<TKey, TValue>(count);
             try
@@ -64,8 +65,8 @@ namespace LoneEftDmaRadar.Tarkov.Unity.Collections
                 {
                     return dict;
                 }
-                var dictBase = LoneEftDmaRadar.DMA.Memory.ReadPtr(addr + EntriesOffset, useCache) + EntriesStartOffset;
-                LoneEftDmaRadar.DMA.Memory.ReadSpan(dictBase, dict.Span, useCache); // Single read into mem buffer
+                var dictBase = MemoryInterface.Memory.ReadPtr(addr + EntriesOffset, useCache) + EntriesStartOffset;
+                MemoryInterface.Memory.ReadSpan(dictBase, dict.Span, useCache); // Single read into mem buffer
                 return dict;
             }
             catch

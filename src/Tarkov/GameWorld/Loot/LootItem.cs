@@ -26,9 +26,12 @@ SOFTWARE.
  *
 */
 
+using Collections.Pooled;
 using LoneEftDmaRadar.Misc;
+using LoneEftDmaRadar.Tarkov.GameWorld.Loot.Helpers;
 using LoneEftDmaRadar.Tarkov.GameWorld.Player;
 using LoneEftDmaRadar.Tarkov.Unity;
+using LoneEftDmaRadar.Tarkov.Unity.Structures;
 using LoneEftDmaRadar.UI.Loot;
 using LoneEftDmaRadar.UI.Radar.Maps;
 using LoneEftDmaRadar.UI.Skia;
@@ -40,15 +43,23 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
     {
         private static EftDmaConfig Config { get; } = App.Config;
         private readonly TarkovMarketItem _item;
+        private readonly bool _isQuestItem;
 
-        public LootItem(TarkovMarketItem item, Vector3 position)
+        // Change from readonly field to mutable field so position can be updated
+        private Vector3 _position;
+        
+        // Store transform for position updates
+        protected UnityTransform _transform;
+
+        public LootItem(TarkovMarketItem item, Vector3 position, bool isQuestItem = false)
         {
             ArgumentNullException.ThrowIfNull(item, nameof(item));
             _item = item;
             _position = position;
+            _isQuestItem = isQuestItem;
         }
 
-        public LootItem(string id, string name, Vector3 position)
+        public LootItem(string id, string name, Vector3 position, bool isQuestItem = false)
         {
             ArgumentNullException.ThrowIfNull(id, nameof(id));
             ArgumentNullException.ThrowIfNull(name, nameof(name));
@@ -61,6 +72,38 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
                 BsgId = id
             };
             _position = position;
+            _isQuestItem = isQuestItem;
+        }
+
+        // Internal constructor for LootManager to set transform
+        internal LootItem(TarkovMarketItem item, Vector3 position, UnityTransform transform, bool isQuestItem = false)
+            : this(item, position, isQuestItem)
+        {
+            _transform = transform;
+        }
+
+        internal LootItem(string id, string name, Vector3 position, UnityTransform transform, bool isQuestItem = false)
+            : this(id, name, position, isQuestItem)
+        {
+            _transform = transform;
+        }
+
+        /// <summary>
+        /// Update the position from the transform if available.
+        /// </summary>
+        internal void UpdatePosition()
+        {
+            if (_transform != null)
+            {
+                try
+                {
+                    _position = _transform.UpdatePosition();
+                }
+                catch
+                {
+                    // Position update failed, keep old position
+                }
+            }
         }
 
         /// <summary>
@@ -106,7 +149,6 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
             }
         }
 
-
         /// <summary>
         /// Number of grid spaces this item takes up.
         /// </summary>
@@ -123,22 +165,38 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
         public bool Important => CustomFilter?.Important ?? false;
 
         /// <summary>
-        /// True if this item is wishlisted.
+        /// True if this item is marked as a quest item by the game data.
         /// </summary>
-        public bool IsWishlisted => Config.Loot.ShowWishlist && LocalPlayer.WishlistItems.ContainsKey(ID);
+        public bool IsQuestItem => _isQuestItem;
 
         /// <summary>
         /// True if the item is blacklisted via the UI.
         /// </summary>
         public bool Blacklisted => CustomFilter?.Blacklisted ?? false;
 
+        /// <summary>
+        /// True if this item is on the player's in-game wishlist.
+        /// </summary>
+        public bool IsWishlisted => App.Config.Loot.ShowWishlistedRadar && LocalPlayer.WishlistItems.Contains(ID);
+
+        /// <summary>
+        /// Checks if an item/container is important.
+        /// </summary>
+        public bool IsImportant
+        {
+            get
+            {
+                if (Blacklisted)
+                    return false;
+                return _item.Important || IsWishlisted; // Include wishlist items as important
+            }
+        }
+
         public bool IsMeds => _item.IsMed;
         public bool IsFood => _item.IsFood;
         public bool IsBackpack => _item.IsBackpack;
         public bool IsWeapon => _item.IsWeapon;
         public bool IsCurrency => _item.IsCurrency;
-        public bool IsQuestItem { get; init; }
-        public bool IsQuestHelperItem => App.Config.QuestHelper.Enabled && (Memory.QuestManager?.ItemConditions?.ContainsKey(ID) ?? false);
 
         /// <summary>
         /// Checks if an item exceeds regular loot price threshold.
@@ -167,50 +225,74 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
         }
 
         /// <summary>
-        /// Checks if an item/container is important.
+        /// True if this item contains the specified Search Predicate.
         /// </summary>
-        public bool IsImportant
+        /// <param name="predicate"></param>
+        /// <returns>True if search matches, otherwise False.</returns>
+        public bool ContainsSearchPredicate(Predicate<LootItem> predicate)
         {
-            get
-            {
-                if (Blacklisted)
-                    return false;
-                return _item.Important || IsWishlisted;
-            }
+            return predicate(this);
         }
 
-        private readonly Vector3 _position; // FilteredLoot doesn't move, readonly ok
         public ref readonly Vector3 Position => ref _position;
         public Vector2 MouseoverPosition { get; set; }
 
         public virtual void Draw(SKCanvas canvas, EftMapParams mapParams, LocalPlayer localPlayer)
         {
+            if (IsQuestItem && !App.Config.Loot.ShowQuestItems)
+                return;
+
             var label = GetUILabel();
             var paints = GetPaints();
             var heightDiff = Position.Y - localPlayer.Position.Y;
             var point = Position.ToMapPos(mapParams.Map).ToZoomedPos(mapParams);
             MouseoverPosition = new Vector2(point.X, point.Y);
-            SKPaints.ShapeOutline.StrokeWidth = 2f;
+            
+            // ✅ Check if this item is currently being hovered (using full namespace)
+            bool isHovered = UI.Radar.ViewModels.RadarViewModel.CurrentMouseoverItem == this;
+            
+            // ✅ Apply hover effect - make marker 30% larger and brighter
+            float sizeMult = isHovered ? 1.3f : 1f;
+            var paintToUse = isHovered ? 
+                new SKPaint 
+                { 
+                    Color = paints.Item1.Color.AdjustBrightness(0.3f), // 30% brighter
+                    StrokeWidth = paints.Item1.StrokeWidth * 1.2f,
+                    Style = paints.Item1.Style,
+                    IsAntialias = paints.Item1.IsAntialias
+                } : paints.Item1;
+            
+            SKPaints.ShapeOutline.StrokeWidth = isHovered ? 3f : 2f; // Thicker outline when hovered
+            
             if (heightDiff > 1.45) // loot is above player
             {
-                using var path = point.GetUpArrow(5);
+                using var path = point.GetUpArrow(5 * sizeMult);
                 canvas.DrawPath(path, SKPaints.ShapeOutline);
-                canvas.DrawPath(path, paints.Item1);
+                canvas.DrawPath(path, paintToUse);
             }
             else if (heightDiff < -1.45) // loot is below player
             {
-                using var path = point.GetDownArrow(5);
+                using var path = point.GetDownArrow(5 * sizeMult);
                 canvas.DrawPath(path, SKPaints.ShapeOutline);
-                canvas.DrawPath(path, paints.Item1);
+                canvas.DrawPath(path, paintToUse);
             }
             else // loot is level with player
             {
-                var size = 5 * App.Config.UI.UIScale;
+                var size = (5 * App.Config.UI.UIScale) * sizeMult;
                 canvas.DrawCircle(point, size, SKPaints.ShapeOutline);
-                canvas.DrawCircle(point, size, paints.Item1);
+                canvas.DrawCircle(point, size, paintToUse);
             }
 
             point.Offset(7 * App.Config.UI.UIScale, 3 * App.Config.UI.UIScale);
+
+            // ✅ Make text brighter when hovered
+            var textPaint = isHovered ?
+                new SKPaint
+                {
+                    Color = paints.Item2.Color.AdjustBrightness(0.3f),
+                    IsStroke = paints.Item2.IsStroke,
+                    IsAntialias = paints.Item2.IsAntialias
+                } : paints.Item2;
 
             canvas.DrawText(
                 label,
@@ -223,23 +305,73 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
                 point,
                 SKTextAlign.Left,
                 SKFonts.UIRegular,
-                paints.Item2);
-
+                textPaint);
         }
 
         public virtual void DrawMouseover(SKCanvas canvas, EftMapParams mapParams, LocalPlayer localPlayer)
         {
-            return; // Regular loot has no extra mouseover info
+            using var lines = new PooledList<string>();
+            
+            // ✅ Show item name
+            lines.Add(GetUILabel());
+            
+            // ✅ Show WHY this marker is visible
+            var reasons = new PooledList<string>();
+            
+            if (IsQuestItem)
+                reasons.Add("Quest Item");
+            
+            if (CustomFilter is not null)
+            {
+                if (CustomFilter.Important)
+                    reasons.Add($"Important Filter: '{CustomFilter.Name}'");
+                else
+                    reasons.Add($"Custom Filter: '{CustomFilter.Name}'");
+            }
+            else
+            {
+                // Not a custom filter, check standard reasons
+                if (IsImportant)
+                    reasons.Add("Important (Wishlist)");
+                else if (IsValuableLoot)
+                    reasons.Add($"Valuable (≥{Utilities.FormatNumberKM(App.Config.Loot.MinValueValuable)})");
+                else if (IsRegularLoot)
+                    reasons.Add($"Loot Filter (≥{Utilities.FormatNumberKM(App.Config.Loot.MinValue)})");
+            }
+            
+            if (IsBackpack)
+                reasons.Add("Backpack");
+            if (IsMeds)
+                reasons.Add("Meds");
+            if (IsFood)
+                reasons.Add("Food");
+            if (IsCurrency)
+                reasons.Add("Currency");
+            
+            // Combine all reasons
+            if (reasons.Count > 0)
+            {
+                lines.Add($"Visible: {string.Join(", ", reasons)}");
+            }
+            
+            reasons.Dispose();
+            
+            // ✅ Show distance
+            float distance = Vector3.Distance(localPlayer.Position, Position);
+            lines.Add($"Distance: {distance:F0}m");
+            
+            Position.ToMapPos(mapParams.Map).ToZoomedPos(mapParams).DrawMouseoverText(canvas, lines.Span);
         }
 
         /// <summary>
         /// Gets a UI Friendly Label.
         /// </summary>
         /// <returns>Item Label string cleaned up for UI usage.</returns>
-        public virtual string GetUILabel()
+        public string GetUILabel()
         {
-            string label = "";
-            if (IsImportant)
+            var label = "";
+            // "!!" only for Wishlist items, not all Important items
+            if (IsWishlisted)
                 label += "!!";
             else if (Price > 0)
                 label += $"[{Utilities.FormatNumberKM(Price)}] ";
@@ -252,8 +384,9 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
 
         private ValueTuple<SKPaint, SKPaint> GetPaints()
         {
-            if (IsQuestHelperItem)
+            if (IsQuestItem)
                 return new(SKPaints.PaintQuestItem, SKPaints.TextQuestItem);
+            // Wishlist takes priority over custom filters
             if (IsWishlisted)
                 return new(SKPaints.PaintWishlistItem, SKPaints.TextWishlistItem);
             if (LootFilter.ShowBackpacks && IsBackpack)
@@ -262,16 +395,13 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
                 return new(SKPaints.PaintMeds, SKPaints.TextMeds);
             if (LootFilter.ShowFood && IsFood)
                 return new(SKPaints.PaintFood, SKPaints.TextFood);
-            if (LootFilter.ShowQuestItems && IsQuestItem)
-                return new(SKPaints.PaintQuestItem, SKPaints.TextQuestItem);
-            string filterColor = CustomFilter?.Color;
-
+            var filterColor = CustomFilter?.Color;
             if (!string.IsNullOrEmpty(filterColor))
             {
                 var filterPaints = GetFilterPaints(filterColor);
                 return new(filterPaints.Item1, filterPaints.Item2);
             }
-            if (IsValuableLoot)
+            if (IsValuableLoot || this is LootAirdrop)
                 return new(SKPaints.PaintImportantLoot, SKPaints.TextImportantLoot);
             return new(SKPaints.PaintLoot, SKPaints.TextLoot);
         }

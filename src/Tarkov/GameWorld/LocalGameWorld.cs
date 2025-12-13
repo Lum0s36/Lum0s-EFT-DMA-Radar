@@ -26,15 +26,17 @@ SOFTWARE.
  *
 */
 
+using LoneEftDmaRadar.DMA;
 using LoneEftDmaRadar.Misc;
 using LoneEftDmaRadar.Misc.Workers;
+using LoneEftDmaRadar.Tarkov.Features.MemWrites;
 using LoneEftDmaRadar.Tarkov.GameWorld.Exits;
 using LoneEftDmaRadar.Tarkov.GameWorld.Explosives;
-using LoneEftDmaRadar.Tarkov.GameWorld.Hazards;
 using LoneEftDmaRadar.Tarkov.GameWorld.Loot;
 using LoneEftDmaRadar.Tarkov.GameWorld.Player;
 using LoneEftDmaRadar.Tarkov.GameWorld.Quests;
 using LoneEftDmaRadar.Tarkov.Unity.Structures;
+using LoneEftDmaRadar.UI.Misc;
 using VmmSharpEx.Options;
 
 namespace LoneEftDmaRadar.Tarkov.GameWorld
@@ -55,10 +57,14 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
         private ulong Base { get; }
 
         private readonly RegisteredPlayers _rgtPlayers;
+        private readonly ExitManager _exfilManager;
         private readonly ExplosivesManager _explosivesManager;
         private readonly WorkerThread _t1;
         private readonly WorkerThread _t2;
         private readonly WorkerThread _t3;
+        private readonly WorkerThread _t4;
+        private readonly MemWritesManager _memWritesManager;
+        private readonly QuestManager _questManager;
 
         /// <summary>
         /// Map ID of Current Map.
@@ -68,11 +74,14 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
         public bool InRaid => !_disposed;
         public IReadOnlyCollection<AbstractPlayer> Players => _rgtPlayers;
         public IReadOnlyCollection<IExplosiveItem> Explosives => _explosivesManager;
+        public IReadOnlyCollection<IExitPoint> Exits => _exfilManager;
         public LocalPlayer LocalPlayer => _rgtPlayers?.LocalPlayer;
         public LootManager Loot { get; }
-        public QuestManager QuestManager { get; }
-        public IReadOnlyList<IExitPoint> Exits { get; }
-        public IReadOnlyList<IWorldHazard> Hazards { get; }
+        
+        /// <summary>
+        /// Quest Manager for tracking active quests and zones.
+        /// </summary>
+        public QuestManager QuestManager => _questManager;
 
         private LocalGameWorld() { }
 
@@ -111,11 +120,18 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
                 var rgtPlayersAddr = Memory.ReadPtr(localGameWorld + Offsets.GameWorld.RegisteredPlayers, false);
                 _rgtPlayers = new RegisteredPlayers(rgtPlayersAddr, this);
                 ArgumentOutOfRangeException.ThrowIfLessThan(_rgtPlayers.GetPlayerCount(), 1, nameof(_rgtPlayers));
-                QuestManager = new(_rgtPlayers.LocalPlayer.Profile);
                 Loot = new(localGameWorld);
+                _exfilManager = new(mapID, _rgtPlayers.LocalPlayer.IsPmc);
                 _explosivesManager = new(localGameWorld);
-                Hazards = GetHazards(MapID);
-                Exits = GetExits(MapID, _rgtPlayers.LocalPlayer.IsPmc);
+                _memWritesManager = new MemWritesManager();
+                _questManager = new QuestManager(localGameWorld);
+                _t4 = new WorkerThread()
+                {
+                    Name = "MemWrites Worker",
+                    ThreadPriority = ThreadPriority.Normal,
+                    SleepDuration = TimeSpan.FromMilliseconds(100)
+                };
+                _t4.PerformWork += MemWritesWorker_PerformWork;
             }
             catch
             {
@@ -124,47 +140,16 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
             }
         }
 
-        private static List<IWorldHazard> GetHazards(string mapId)
-        {
-            var list = new List<IWorldHazard>();
-            if (TarkovDataManager.MapData.TryGetValue(mapId, out var mapData))
-            {
-                foreach (var hazard in mapData.Hazards)
-                {
-                    list.Add(hazard);
-                }
-            }
-            return list;
-        }
-
-        private static List<IExitPoint> GetExits(string mapId, bool isPMC)
-        {
-            var list = new List<IExitPoint>();
-            if (TarkovDataManager.MapData.TryGetValue(mapId, out var mapData))
-            {
-                var filteredExfils = isPMC ?
-                    mapData.Extracts.Where(x => x.IsShared || x.IsPmc) :
-                    mapData.Extracts.Where(x => !x.IsPmc);
-                foreach (var exfil in filteredExfils)
-                {
-                    list.Add(new Exfil(exfil));
-                }
-                foreach (var transit in mapData.Transits)
-                {
-                    list.Add(new TransitPoint(transit));
-                }
-            }
-            return list;
-        }
-
         /// <summary>
         /// Start all Game Threads.
         /// </summary>
         public void Start()
         {
+            _memWritesManager?.OnRaidStart();
             _t1.Start();
             _t2.Start();
             _t3.Start();
+            _t4.Start();
         }
 
         /// <summary>
@@ -180,16 +165,20 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
                 try
                 {
                     var instance = GetLocalGameWorld(ct);
-                    Debug.WriteLine("Raid has started!");
+                    DebugLogger.LogDebug("Raid has started!");
                     return instance;
                 }
                 catch (OperationCanceledException)
                 {
                     throw;
                 }
+                catch (Exception ex) when (ex.InnerException?.Message?.Contains("GameWorld not found") == true)
+                {
+                    // Expected when not in raid - silently continue polling
+                }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"ERROR Instantiating Game Instance: {ex}");
+                    DebugLogger.LogDebug($"ERROR Instantiating Game Instance: {ex}");
                 }
                 finally
                 {
@@ -209,11 +198,11 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
         /// <returns>True if Raid has started, otherwise False.</returns>
         private static LocalGameWorld GetLocalGameWorld(CancellationToken ct)
         {
-            ct.ThrowIfCancellationRequested();
             try
             {
                 /// Get LocalGameWorld
                 var localGameWorld = GameObjectManager.Get().GetGameWorld(ct, out string map);
+                if (localGameWorld == 0) throw new Exception("GameWorld Address is 0");
                 return new LocalGameWorld(localGameWorld, map);
             }
             catch (OperationCanceledException)
@@ -241,12 +230,12 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
             }
             catch (OperationCanceledException ex) // Raid Ended
             {
-                Debug.WriteLine(ex.Message);
+                DebugLogger.LogDebug(ex.Message);
                 Dispose();
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"CRITICAL ERROR - Raid ended due to unhandled exception: {ex}");
+                DebugLogger.LogDebug($"CRITICAL ERROR - Raid ended due to unhandled exception: {ex}");
                 throw;
             }
         }
@@ -297,24 +286,23 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
         /// </summary>
         private void RealtimeWorker_PerformWork(object sender, WorkerThreadArgs e)
         {
-            bool hasPlayers = false;
-            
-            using var scatter = Memory.CreateScatter(VmmFlags.NOCACHE);
-            foreach (var player in _rgtPlayers)
-            {
-                if (player.IsActive && player.IsAlive)
-                {
-                    hasPlayers = true;
-                    player.OnRealtimeLoop(scatter);
-                }
-            }
-            
-            if (!hasPlayers)
+            var players = _rgtPlayers.Where(x => x.IsActive && x.IsAlive);
+            var localPlayer = LocalPlayer;
+            if (!players.Any()) // No players - Throttle
             {
                 Thread.Sleep(1);
                 return;
             }
-            
+
+            using var scatter = Memory.CreateScatter(VmmFlags.NOCACHE);
+            if (MemDMA.CameraManager != null && localPlayer != null)
+            {
+                MemDMA.CameraManager.OnRealtimeLoop(scatter, localPlayer);
+            }
+            foreach (var player in players)
+            {
+                player.OnRealtimeLoop(scatter);
+            }
             scatter.Execute();
         }
 
@@ -330,14 +318,33 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
         {
             var ct = e.CancellationToken;
             ValidatePlayerTransforms(); // Check for transform anomalies
+            // Sync FilteredLoot
             Loot.Refresh(ct);
-            if (App.Config.Loot.ShowWishlist)
-                Memory.LocalPlayer?.RefreshWishlist(ct);
-            RefreshEquipment(ct);
-            RefreshQuestHelper(ct);
+            // Refresh player equipment
+            RefreshEquipment();
+            // Refresh Wishlist
+            RefreshWishlist();
         }
 
-        private void RefreshEquipment(CancellationToken ct)
+        /// <summary>
+        /// Refreshes the wishlist from game memory.
+        /// </summary>
+        private void RefreshWishlist()
+        {
+            if (!App.Config.Loot.ShowWishlistedRadar)
+                return;
+
+            try
+            {
+                LocalPlayer?.RefreshWishlist();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.LogDebug($"[Wishlist] ERROR Refreshing: {ex}");
+            }
+        }
+
+        private void RefreshEquipment()
         {
             var players = _rgtPlayers
                 .OfType<ObservedPlayer>()
@@ -345,16 +352,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
                     && x.IsActive && x.IsAlive);
             foreach (var player in players)
             {
-                ct.ThrowIfCancellationRequested();
                 player.Equipment.Refresh();
-            }
-        }
-
-        private void RefreshQuestHelper(CancellationToken ct)
-        {
-            if (App.Config.QuestHelper.Enabled)
-            {
-                QuestManager.Refresh(ct);
             }
         }
 
@@ -362,26 +360,49 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
         {
             try
             {
-                using var map = Memory.CreateScatterMap();
-                var round1 = map.AddRound();
-                var round2 = map.AddRound();
-                bool hasPlayers = false;
-                
-                foreach (var player in _rgtPlayers)
+                var players = _rgtPlayers
+                    .Where(x => x.IsActive && x.IsAlive && x is not BtrPlayer);
+                if (players.Any()) // at least 1 player
                 {
-                    if (player.IsActive && player.IsAlive && player is not BtrPlayer)
+                    using var map = Memory.CreateScatterMap();
+                    var round1 = map.AddRound();
+                    var round2 = map.AddRound();
+                    foreach (var player in players)
                     {
-                        hasPlayers = true;
                         player.OnValidateTransforms(round1, round2);
                     }
+                    map.Execute(); // execute scatter read
                 }
-                
-                if (hasPlayers)
-                    map.Execute();
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"CRITICAL ERROR - ValidatePlayerTransforms Loop FAILED: {ex}");
+                DebugLogger.LogDebug($"CRITICAL ERROR - ValidatePlayerTransforms Loop FAILED: {ex}");
+            }
+        }
+
+        #endregion
+
+        #region MemWrites Thread T4
+
+        private void MemWritesWorker_PerformWork(object sender, WorkerThreadArgs e)
+        {
+            try
+            {
+                if (!App.Config.MemWrites.Enabled)
+                {
+                    Thread.Sleep(100);
+                    return;
+                }
+
+                var localPlayer = LocalPlayer;
+                if (localPlayer is null)
+                    return;
+
+                _memWritesManager.Apply(localPlayer);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.LogDebug($"[MemWritesWorker] Error: {ex}");
             }
         }
 
@@ -410,15 +431,16 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
             {
                 if (_rgtPlayers.Any(p => p is BtrPlayer))
                     return;
+
                 var btrController = Memory.ReadPtr(this + Offsets.GameWorld.BtrController);
                 var btrView = Memory.ReadPtr(btrController + Offsets.BtrController.BtrView);
                 var btrTurretView = Memory.ReadPtr(btrView + Offsets.BTRView.turret);
-                var btrOperator = Memory.ReadPtr(btrTurretView + Offsets.BTRTurretView._bot);
+                var btrOperator = Memory.ReadPtr(btrTurretView + Offsets.BTRTurretView.AttachedBot);
                 _rgtPlayers.TryAllocateBTR(btrView, btrOperator);
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"ERROR Allocating BTR: {ex}");
+                DebugLogger.LogDebug($"ERROR Allocating BTR: {ex}");
             }
         }
 
@@ -435,6 +457,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
                 _t1?.Dispose();
                 _t2?.Dispose();
                 _t3?.Dispose();
+                _t4?.Dispose();
             }
         }
 

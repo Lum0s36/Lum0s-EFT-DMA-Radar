@@ -26,26 +26,60 @@ SOFTWARE.
  *
 */
 
+using System.Diagnostics;
 using Collections.Pooled;
 using LoneEftDmaRadar.Tarkov.Unity;
 using LoneEftDmaRadar.Tarkov.Unity.Collections;
 using LoneEftDmaRadar.Tarkov.Unity.Structures;
+using LoneEftDmaRadar.UI.Misc;
 using VmmSharpEx.Scatter;
 
 namespace LoneEftDmaRadar.Tarkov.GameWorld.Player
 {
     public sealed class LocalPlayer : ClientPlayer
     {
+        #region Wishlist Static Members
+
+        /// <summary>
+        /// Statische Sammlung aller Wishlist-Item-IDs.
+        /// </summary>
+        public static IReadOnlySet<string> WishlistItems => _wishlistItems;
+        private static HashSet<string> _wishlistItems = new(StringComparer.OrdinalIgnoreCase);
+        private static readonly Lock _wishlistLock = new();
+
+        #endregion
+
+        /// <summary>
+        /// Firearm Manager for tracking weapon/ammo/ballistics.
+        /// </summary>
+        public FirearmManager FirearmManager { get; private set; }
+        
         private UnityTransform _lookRaycastTransform;
 
         /// <summary>
-        /// Local Player's 'Look' position.
-        /// Useful for proper POV on Aimview,etc.
+        /// Local Player's "look" position for accurate POV in aimview.
+        /// Falls back to root position if unavailable.
         /// </summary>
-        /// <remarks>
-        /// Will failover to root position if there is no Look Pos.
-        /// </remarks>
         public Vector3 LookPosition => _lookRaycastTransform?.Position ?? this.Position;
+
+        /// <summary>
+        /// Public accessor for Hands Controller (used by FirearmManager).
+        /// </summary>
+        public new ulong HandsController
+        {
+            get => base.HandsController;
+            private set => base.HandsController = value;
+        }
+
+        /// <summary>
+        /// Spawn Point.
+        /// </summary>
+        public string EntryPoint { get; }
+
+        /// <summary>
+        /// Profile ID (if Player Scav). Used for Exfils.
+        /// </summary>
+        public string ProfileId { get; }
 
         /// <summary>
         /// Player name.
@@ -55,6 +89,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player
             get => "localPlayer";
             set { }
         }
+        
         /// <summary>
         /// Player is Human-Controlled.
         /// </summary>
@@ -66,137 +101,210 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player
             if (!(classType == "LocalPlayer" || classType == "ClientPlayer"))
                 throw new ArgumentOutOfRangeException(nameof(classType));
             IsHuman = true;
+            FirearmManager = new FirearmManager(this);
+
+            if (IsPmc)
+            {
+                var entryPtr = Memory.ReadPtr(Info + Offsets.PlayerInfo.EntryPoint);
+                EntryPoint = Memory.ReadUnicodeString(entryPtr);
+            }
+            else if (IsScav)
+            {
+                var profileIdPtr = Memory.ReadPtr(Profile + Offsets.Profile.Id);
+                ProfileId = Memory.ReadUnicodeString(profileIdPtr);
+            }
         }
 
-        public override void OnRealtimeLoop(VmmScatter scatter)
+        /// <summary>
+        /// Update FirearmManager (call this before using weapon data).
+        /// </summary>
+        public void UpdateFirearmManager()
         {
             try
             {
-                if (App.Config.AimviewWidget.Enabled)
+                HandsController = Memory.ReadPtr(Base + Offsets.Player._handsController, false);
+                FirearmManager?.Update();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.LogDebug($"[LocalPlayer] FirearmManager update failed: {ex}");
+            }
+        }
+
+        /// <summary>
+        /// Checks if LocalPlayer is Aiming (ADS).
+        /// </summary>
+        public bool CheckIfADS()
+        {
+            try
+            {
+                return Memory.ReadValue<bool>(PWA + Offsets.ProceduralWeaponAnimation._isAiming, false);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Refreshes the Wishlist from game memory.
+        /// Should be called periodically from a background thread.
+        /// </summary>
+        public void RefreshWishlist()
+        {
+            try
+            {
+                var wishlistManager = Memory.ReadPtr(Profile + Offsets.Profile.WishlistManager);
+                if (wishlistManager == 0)
+                    return;
+
+                var newWishlist = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                // Try _userItems first (0x28) - this is Dictionary<MongoID, int>
+                var userItemsPtr = Memory.ReadPtr(wishlistManager + Offsets.WishlistManager.UserItems);
+                
+                if (userItemsPtr != 0)
                 {
-                    _lookRaycastTransform ??= new UnityTransform(
-                        transformInternal: Memory.ReadPtrChain(Memory.ReadPtr(this + Offsets.Player._playerLookRaycastTransform), true, 0x10),
-                        useCache: false);
-                    scatter.PrepareReadArray<UnityTransform.TrsX>(_lookRaycastTransform.VerticesAddr, _lookRaycastTransform.Count);
-                    scatter.Completed += (sender, s) =>
+                    ReadDictionaryItems(userItemsPtr, newWishlist);
+                }
+
+                // Also try _wishlistItems (0x30) if no items found
+                if (newWishlist.Count == 0)
+                {
+                    var wishlistItemsPtr = Memory.ReadPtr(wishlistManager + Offsets.WishlistManager.WishlistItems);
+                    
+                    if (wishlistItemsPtr != 0 && wishlistItemsPtr != userItemsPtr)
                     {
-                        try
+                        ReadDictionaryItems(wishlistItemsPtr, newWishlist);
+                    }
+                }
+
+                lock (_wishlistLock)
+                {
+                    _wishlistItems = newWishlist;
+                }
+            }
+            catch
+            {
+                // Silently fail - wishlist is optional feature
+            }
+        }
+
+        /// <summary>
+        /// Reads items from a Dictionary<MongoID, int> structure.
+        /// </summary>
+        private void ReadDictionaryItems(ulong dictPtr, HashSet<string> results)
+        {
+            try
+            {
+                // Try multiple count offsets
+                var count1 = Memory.ReadValue<int>(dictPtr + 0x20);
+                var count2 = Memory.ReadValue<int>(dictPtr + 0x40);
+                var count = (count1 > 0 && count1 < 1000) ? count1 : count2;
+
+                if (count <= 0 || count > 500)
+                    return;
+
+                var entriesPtr = Memory.ReadPtr(dictPtr + 0x18);
+                if (entriesPtr == 0)
+                    return;
+
+                // Try different entry layouts
+                int[] entrySizes = { 0x28, 0x30, 0x20, 0x38 };
+                int[] keyOffsets = { 0x08, 0x10, 0x00 };
+                
+                foreach (var entrySize in entrySizes)
+                {
+                    foreach (var keyOffset in keyOffsets)
+                    {
+                        var tempResults = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        var entriesStart = entriesPtr + 0x20; // Skip array header
+                        
+                        for (int i = 0; i < count; i++)
                         {
-                            if (s.ReadPooled<UnityTransform.TrsX>(_lookRaycastTransform.VerticesAddr, _lookRaycastTransform.Count) is IMemoryOwner<UnityTransform.TrsX> vertices)
+                            try
                             {
-                                using (vertices)
+                                var entryAddr = entriesStart + (ulong)(i * entrySize);
+                                // MongoID._stringId is at offset 0x10 within MongoID
+                                var stringIdPtr = Memory.ReadPtr(entryAddr + (ulong)keyOffset + 0x10);
+                                
+                                if (stringIdPtr != 0 && stringIdPtr > 0x10000)
                                 {
-                                    _ = _lookRaycastTransform.UpdatePosition(vertices.Memory.Span);
+                                    var itemId = Memory.ReadUnicodeString(stringIdPtr, 64, true);
+                                    if (!string.IsNullOrEmpty(itemId) && itemId.Length >= 20 && itemId.Length <= 30)
+                                    {
+                                        tempResults.Add(itemId);
+                                    }
                                 }
                             }
-                            else
-                            {
-                                throw new InvalidOperationException("Failed to set LookRaycastTransform pos.");
-                            }
+                            catch { }
                         }
-                        catch
+                        
+                        if (tempResults.Count > 0)
                         {
-                            _lookRaycastTransform = null;
+                            foreach (var id in tempResults)
+                            {
+                                results.Add(id);
+                            }
+                            return;
                         }
-                    };
+                    }
+                }
+            }
+            catch
+            {
+                // Silently fail
+            }
+        }
+
+        /// <summary>
+        /// Initializes and updates the look raycast transform using memory scatter reads.
+        /// Called when aimview is enabled.
+        /// </summary>
+        public override void OnRealtimeLoop(VmmScatter scatter)
+        {
+            base.OnRealtimeLoop(scatter);
+
+            try
+            {
+                var transformPtr = Memory.ReadPtr(Base + Offsets.Player._playerLookRaycastTransform, false);
+
+                if (transformPtr != 0x0)
+                    _lookRaycastTransform = new UnityTransform(transformPtr);
+                else
+                    _lookRaycastTransform = null;
+            }
+            catch
+            {
+                _lookRaycastTransform = null;
+            }
+        }
+
+        public override void OnValidateTransforms()
+        {
+            base.OnValidateTransforms();
+
+            if (_lookRaycastTransform is null)
+                return;
+
+            try
+            {
+                var hierarchy = Memory.ReadPtr(_lookRaycastTransform.TransformInternal + UnitySDK.UnityOffsets.TransformAccess_HierarchyOffset);
+                var vertexAddr = Memory.ReadPtr(hierarchy + UnitySDK.UnityOffsets.Hierarchy_VerticesOffset);
+                if (vertexAddr == 0x0)
+                {
+                    DebugLogger.LogWarning("LookRaycast transform changed, updating cached transform...");
+                    var transformPtr = Memory.ReadPtr(Base + Offsets.Player._playerLookRaycastTransform, false);
+                    if (transformPtr != 0x0)
+                        _lookRaycastTransform = new UnityTransform(transformPtr);
+                    else
+                        _lookRaycastTransform = null;
                 }
             }
             catch
             {
                 _lookRaycastTransform = null;
             }
-            finally
-            {
-                base.OnRealtimeLoop(scatter);
-            }
         }
-
-        public override void OnValidateTransforms(VmmScatter round1, VmmScatter round2)
-        {
-            try
-            {
-                if (App.Config.AimviewWidget.Enabled && _lookRaycastTransform is UnityTransform existing)
-                {
-                    round1.PrepareReadPtr(existing.TransformInternal + UnitySDK.UnityOffsets.TransformAccess_HierarchyOffset); // Transform Hierarchy
-                    round1.Completed += (sender, s1) =>
-                    {
-                        if (s1.ReadPtr(existing.TransformInternal + UnitySDK.UnityOffsets.TransformAccess_HierarchyOffset, out var tra))
-                        {
-                            round2.PrepareReadPtr(tra + UnitySDK.UnityOffsets.Hierarchy_VerticesOffset); // Vertices Ptr
-                            round2.Completed += (sender, s2) =>
-                            {
-                                if (s2.ReadPtr(tra + UnitySDK.UnityOffsets.Hierarchy_VerticesOffset, out var verticesPtr))
-                                {
-                                    if (existing.VerticesAddr != verticesPtr) // check if any addr changed
-                                    {
-                                        Debug.WriteLine($"WARNING - '_lookRaycastTransform' Transform has changed for LocalPlayer '{Name}'");
-                                        var transform = new UnityTransform(existing.TransformInternal);
-                                        _lookRaycastTransform = transform;
-                                    }
-                                }
-                            };
-                        }
-                    };
-                }
-            }
-            finally
-            {
-                base.OnValidateTransforms(round1, round2);
-            }
-        }
-
-        #region Wishlist
-
-        /// <summary>
-        /// All Items on the Player's WishList.
-        /// </summary>
-        public static IReadOnlyDictionary<string, byte> WishlistItems => _wishlistItems;
-        private static readonly ConcurrentDictionary<string, byte> _wishlistItems = new(StringComparer.OrdinalIgnoreCase);
-        private static readonly RateLimiter _wishlistRL = new(TimeSpan.FromSeconds(10));
-
-        /// <summary>
-        /// Set the Player's WishList.
-        /// </summary>
-        public void RefreshWishlist(CancellationToken ct)
-        {
-            try
-            {
-                if (!_wishlistRL.TryEnter())
-                    return;
-                    
-                var wishlistManager = Memory.ReadPtr(Profile + Offsets.Profile.WishlistManager);
-                var itemsPtr = Memory.ReadPtr(wishlistManager + Offsets.WishlistManager._wishlistItems);
-                using var items = UnityDictionary<MongoID, int>.Create(itemsPtr);
-                using var newWishlist = new PooledSet<string>(items.Count, StringComparer.OrdinalIgnoreCase);
-                
-                foreach (var item in items)
-                {
-                    ct.ThrowIfCancellationRequested();
-                    try
-                    {
-                        newWishlist.Add(item.Key.ReadString());
-                    }
-                    catch { }
-                }
-                
-                foreach (var existing in _wishlistItems.Keys)
-                {
-                    if (!newWishlist.Contains(existing))
-                        _wishlistItems.TryRemove(existing, out _);
-                }
-                
-                foreach (var newItem in newWishlist)
-                {
-                    _wishlistItems.TryAdd(newItem, 0);
-                }
-            }
-            catch (OperationCanceledException) { throw; }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[Wishlist] ERROR Refreshing: {ex}");
-            }
-        }
-
-        #endregion
     }
 }

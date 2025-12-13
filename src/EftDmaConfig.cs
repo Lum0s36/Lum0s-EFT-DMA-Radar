@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Lone EFT DMA Radar
  * Brought to you by Lone (Lone DMA)
  * 
@@ -26,10 +26,14 @@ SOFTWARE.
  *
 */
 
+using LoneEftDmaRadar.Common.DMA;
+using LoneEftDmaRadar.DMA;
 using LoneEftDmaRadar.Misc.JSON;
 using LoneEftDmaRadar.UI.ColorPicker;
 using LoneEftDmaRadar.UI.Data;
 using LoneEftDmaRadar.UI.Loot;
+using LoneEftDmaRadar.Tarkov.Unity.Structures;
+using Size = System.Windows.Size;
 using System.Collections.ObjectModel;
 using VmmSharpEx.Extensions.Input;
 
@@ -40,6 +44,10 @@ namespace LoneEftDmaRadar
     /// </summary>
     public sealed class EftDmaConfig
     {
+        private static readonly JsonSerializerOptions _jsonOptions = new()
+        {
+            WriteIndented = true
+        };
         /// <summary>
         /// Public Constructor required for deserialization.
         /// DO NOT CALL - USE LOAD().
@@ -103,6 +111,13 @@ namespace LoneEftDmaRadar
         public ConcurrentDictionary<Win32VirtualKey, string> Hotkeys { get; private set; } = new(); // Default entries
 
         /// <summary>
+        /// Hotkey input mode - determines where hotkeys are detected from.
+        /// </summary>
+        [JsonPropertyName("hotkeyInputMode")]
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        public HotkeyInputMode HotkeyInputMode { get; set; } = HotkeyInputMode.RadarPC;
+
+        /// <summary>
         /// All defined Radar Colors.
         /// </summary>
         [JsonPropertyName("radarColors")]
@@ -125,11 +140,25 @@ namespace LoneEftDmaRadar
         public InfoWidgetConfig InfoWidget { get; private set; } = new();
 
         /// <summary>
-        /// Quest Helper Cfg
+        /// Loot Info Widget Configuration.
         /// </summary>
-        [JsonPropertyName("questHelper")]
         [JsonInclude]
-        public QuestHelperConfig QuestHelper { get; private set; } = new();
+        [JsonPropertyName("lootInfoWidget")]
+        public LootInfoWidgetConfig LootInfoWidget { get; private set; } = new();
+
+        /// <summary>
+        /// Settings for Device Aimbot (DeviceAimbot/KMBox).
+        /// </summary>
+        [JsonPropertyName("device")]
+        [JsonInclude]
+        public DeviceAimbotConfig Device { get; private set; } = new();
+
+        /// <summary>
+        /// Settings for memory write based features.
+        /// </summary>
+        [JsonPropertyName("memWrites")]
+        [JsonInclude]
+        public MemWritesConfig MemWrites { get; private set; } = new();
 
         /// <summary>
         /// Player Watchlist Collection.
@@ -314,6 +343,13 @@ namespace LoneEftDmaRadar
         [JsonPropertyName("lootFilters")]
         public LootFilterConfig LootFilters { get; private set; } = new();
 
+        /// <summary>
+        /// Quest Helper Configuration.
+        /// </summary>
+        [JsonPropertyName("questHelper")]
+        [JsonInclude]
+        public QuestHelperConfig QuestHelper { get; private set; } = new();
+
         #region Config Interface
 
         /// <summary>
@@ -383,7 +419,7 @@ namespace LoneEftDmaRadar
                 if (!file.Exists)
                     return null;
                 string json = File.ReadAllText(file.FullName);
-                return JsonSerializer.Deserialize<EftDmaConfig>(json, App.JsonOptions);
+                return JsonSerializer.Deserialize<EftDmaConfig>(json, _jsonOptions);
             }
             catch
             {
@@ -418,7 +454,7 @@ namespace LoneEftDmaRadar
 
         private static void SaveInternal(EftDmaConfig config)
         {
-            var json = JsonSerializer.Serialize(config, App.JsonOptions);
+            var json = JsonSerializer.Serialize(config, _jsonOptions);
             using (var fs = new FileStream(
                 _tempFile.FullName,
                 FileMode.Create,
@@ -482,6 +518,11 @@ namespace LoneEftDmaRadar
         /// </summary>
         [JsonPropertyName("windowSize")]
         public Size WindowSize { get; set; } = new(1280, 720);
+        /// <summary>
+        /// Preferred rendering resolution for ESP/aim helpers.
+        /// </summary>
+        [JsonPropertyName("resolution")]
+        public Size Resolution { get; set; } = new(1920, 1080);
 
         /// <summary>
         /// Window is maximized.
@@ -502,10 +543,16 @@ namespace LoneEftDmaRadar
         public int AimLineLength { get; set; } = 1500;
 
         /// <summary>
-        /// Show Hazards (mines,snipers,etc.) in the Radar UI.
+        /// Camera Field of View (Vertical).
         /// </summary>
-        [JsonPropertyName("showHazards")]
-        public bool ShowHazards { get; set; } = true;
+        [JsonPropertyName("fov")]
+        public float FOV { get; set; } = 50.0f;
+
+        /// <summary>
+        /// Show Mines/Claymores in the Radar UI.
+        /// </summary>
+        [JsonPropertyName("showMines")]
+        public bool ShowMines { get; set; } = true;
 
         /// <summary>
         /// Hides player names & extended player info in Radar GUI.
@@ -532,6 +579,12 @@ namespace LoneEftDmaRadar
         public bool TeammateAimlines { get; set; }
 
         /// <summary>
+        /// Teammate Aimline Length (0 = use same as player's AimLineLength, Max: 1500)
+        /// </summary>
+        [JsonPropertyName("teammateAimlineLength")]
+        public int TeammateAimlineLength { get; set; } = 0;
+
+        /// <summary>
         /// True if AI Aimlines should dynamically extend.
         /// </summary>
         [JsonPropertyName("aiAimlines")]
@@ -544,10 +597,373 @@ namespace LoneEftDmaRadar
         public bool MarkSusPlayers { get; set; } = false;
 
         /// <summary>
-        /// Show exfils on radar.
+        /// Show Player Skeletons in ESP.
         /// </summary>
-        [JsonPropertyName("showExfils")]
-        public bool ShowExfils { get; set; } = true;
+        [JsonPropertyName("espPlayerSkeletons")]
+        public bool EspPlayerSkeletons { get; set; } = true;
+
+        /// <summary>
+        /// Show Player Boxes in ESP.
+        /// </summary>
+        [JsonPropertyName("espPlayerBoxes")]
+        public bool EspPlayerBoxes { get; set; } = true;
+        
+        /// <summary>
+        /// Show AI Skeletons in ESP.
+        /// </summary>
+        [JsonPropertyName("espAISkeletons")]
+        public bool EspAISkeletons { get; set; } = true;
+
+        /// <summary>
+        /// Show AI Boxes in ESP.
+        /// </summary>
+        [JsonPropertyName("espAIBoxes")]
+        public bool EspAIBoxes { get; set; } = true;
+
+        /// <summary>
+        /// Show Player Names in ESP.
+        /// </summary>
+        [JsonPropertyName("espPlayerNames")]
+        public bool EspPlayerNames { get; set; } = true;
+        /// <summary>
+        /// Show Player Group IDs in ESP.
+        /// </summary>
+        [JsonPropertyName("espGroupIds")]
+        public bool EspGroupIds { get; set; } = true;
+        /// <summary>
+        /// Show Player faction (USEC/BEAR) in ESP.
+        /// </summary>
+        [JsonPropertyName("espPlayerFaction")]
+        public bool EspPlayerFaction { get; set; } = false;
+        /// <summary>
+        /// Color PMCs by faction (USEC/BEAR) when group colors are disabled.
+        /// </summary>
+        [JsonPropertyName("espFactionColors")]
+        public bool EspFactionColors { get; set; } = true;
+        /// <summary>
+        /// Color hostile human players by group.
+        /// </summary>
+        [JsonPropertyName("espGroupColors")]
+        public bool EspGroupColors { get; set; } = true;
+        /// <summary>
+        /// Show Player Health status in ESP.
+        /// </summary>
+        [JsonPropertyName("espPlayerHealth")]
+        public bool EspPlayerHealth { get; set; } = true;
+        /// <summary>
+        /// Show Player Distance in ESP.
+        /// </summary>
+        [JsonPropertyName("espPlayerDistance")]
+        public bool EspPlayerDistance { get; set; } = true;
+
+        /// <summary>
+        /// Show AI Names in ESP.
+        /// </summary>
+        [JsonPropertyName("espAINames")]
+        public bool EspAINames { get; set; } = true;
+        /// <summary>
+        /// Show AI Group IDs in ESP.
+        /// </summary>
+        [JsonPropertyName("espAIGroupIds")]
+        public bool EspAIGroupIds { get; set; } = false;
+        /// <summary>
+        /// Show AI Health status in ESP.
+        /// </summary>
+        [JsonPropertyName("espAIHealth")]
+        public bool EspAIHealth { get; set; } = true;
+        /// <summary>
+        /// Show AI Distance in ESP.
+        /// </summary>
+        [JsonPropertyName("espAIDistance")]
+        public bool EspAIDistance { get; set; } = true;
+
+        /// <summary>
+        /// Show ESP Overlay.
+        /// </summary>
+        [JsonPropertyName("showESP")]
+        public bool ShowESP { get; set; } = true;
+        
+        /// <summary>
+        /// Show Exfils on ESP.
+        /// </summary>
+        [JsonPropertyName("espExfils")]
+        public bool EspExfils { get; set; } = true;
+
+        [JsonPropertyName("espTripwires")]
+        public bool EspTripwires { get; set; } = true;
+
+        [JsonPropertyName("espGrenades")]
+        public bool EspGrenades { get; set; } = true;
+
+        /// <summary>
+        /// Show Loot on ESP.
+        /// </summary>
+        [JsonPropertyName("espLoot")]
+        public bool EspLoot { get; set; } = true;
+
+        /// <summary>
+        /// Show quest items on ESP.
+        /// </summary>
+        [JsonPropertyName("espQuestLoot")]
+        public bool EspQuestLoot { get; set; } = true;
+
+        /// <summary>
+        /// Show Loot Prices on ESP.
+        /// </summary>
+        [JsonPropertyName("espLootPrice")]
+        public bool EspLootPrice { get; set; } = true;
+
+        [JsonPropertyName("espLootConeEnabled")]
+        public bool EspLootConeEnabled { get; set; } = true;
+
+        [JsonPropertyName("espLootConeAngle")]
+        public float EspLootConeAngle { get; set; } = 15f;
+
+        /// <summary>
+        /// Show Food items on ESP.
+        /// </summary>
+        [JsonPropertyName("espFood")]
+        public bool EspFood { get; set; } = false;
+
+        /// <summary>
+        /// Show Medical items on ESP.
+        /// </summary>
+        [JsonPropertyName("espMeds")]
+        public bool EspMeds { get; set; } = false;
+
+        /// <summary>
+        /// Show Backpacks on ESP.
+        /// </summary>
+        [JsonPropertyName("espBackpacks")]
+        public bool EspBackpacks { get; set; } = false;
+
+        /// <summary>
+        /// Show wishlisted items on ESP.
+        /// </summary>
+        [JsonPropertyName("espShowWishlisted")]
+        public bool EspShowWishlisted { get; set; } = true;
+
+        /// <summary>
+        /// Show only filtered loot items on ESP (items in Loot Filters).
+        /// </summary>
+        [JsonPropertyName("espLootFilterOnly")]
+        public bool EspLootFilterOnly { get; set; } = false;
+
+        /// <summary>
+        /// Show ESP Loot Debug overlay.
+        /// </summary>
+        [JsonPropertyName("espLootDebug")]
+        public bool EspLootDebug { get; set; } = false;
+
+        /// <summary>
+        /// Show Corpses on ESP.
+        /// </summary>
+        [JsonPropertyName("espCorpses")]
+        public bool EspCorpses { get; set; } = false;
+
+        /// <summary>
+        /// Show Containers on ESP.
+        /// </summary>
+        [JsonPropertyName("espContainers")]
+        public bool EspContainers { get; set; } = false;
+
+        /// <summary>
+        /// Show nearest player info in center-bottom of ESP window.
+        /// </summary>
+        [JsonPropertyName("espNearestPlayerInfo")]
+        public bool EspNearestPlayerInfo { get; set; } = true;
+
+        /// <summary>
+        /// Show a crosshair overlay on ESP window.
+        /// </summary>
+        [JsonPropertyName("espCrosshair")]
+        public bool EspCrosshair { get; set; }
+
+        /// <summary>
+        /// Crosshair half-length in pixels.
+        /// </summary>
+        [JsonPropertyName("espCrosshairLength")]
+        public float EspCrosshairLength { get; set; } = 25f;
+
+        /// <summary>
+        /// Font family used for ESP text (DX overlay).
+        /// </summary>
+        [JsonPropertyName("espFontFamily")]
+        public string EspFontFamily { get; set; } = "Segoe UI";
+
+        /// <summary>
+        /// Small font size used for ESP text (loot labels, etc).
+        /// </summary>
+        [JsonPropertyName("espFontSizeSmall")]
+        public int EspFontSizeSmall { get; set; } = 10;
+
+        /// <summary>
+        /// Medium font size used for ESP text (player names, exfil labels).
+        /// </summary>
+        [JsonPropertyName("espFontSizeMedium")]
+        public int EspFontSizeMedium { get; set; } = 12;
+
+        /// <summary>
+        /// Large font size used for ESP text (status banners).
+        /// </summary>
+        [JsonPropertyName("espFontSizeLarge")]
+        public int EspFontSizeLarge { get; set; } = 24;
+
+        /// <summary>
+        /// Custom ESP Screen Width (0 = Auto).
+        /// </summary>
+        [JsonPropertyName("espScreenWidth")]
+        public int EspScreenWidth { get; set; } = 0;
+
+        /// <summary>
+        /// Custom ESP Screen Height (0 = Auto).
+        /// </summary>
+        [JsonPropertyName("espScreenHeight")]
+        public int EspScreenHeight { get; set; } = 0;
+
+        /// <summary>
+        /// ESP Max FPS (0 = VSync/Unlimited).
+        /// </summary>
+        [JsonPropertyName("espMaxFPS")]
+        public int EspMaxFPS { get; set; } = 0;
+
+        // ESP Colors (independent from radar colors)
+        [JsonPropertyName("espColorPlayers")]
+        public string EspColorPlayers { get; set; } = "#FFFFFFFF";
+
+        [JsonPropertyName("espColorAI")]
+        public string EspColorAI { get; set; } = "#FFFFA500";
+
+        /// <summary>
+        /// ESP color for player-controlled scavs (PScavs).
+        /// </summary>
+        [JsonPropertyName("espColorPlayerScavs")]
+        public string EspColorPlayerScavs { get; set; } = "#FFFFFFFF";
+
+        [JsonPropertyName("espColorRaiders")]
+        public string EspColorRaiders { get; set; } = "#FFFFC70F";
+
+        [JsonPropertyName("espColorBosses")]
+        public string EspColorBosses { get; set; } = "#FFFF00FF";
+
+        [JsonPropertyName("espColorLoot")]
+        public string EspColorLoot { get; set; } = "#FFD0D0D0";
+
+        /// <summary>
+        /// ESP color for static containers.
+        /// </summary>
+        [JsonPropertyName("espColorContainers")]
+        public string EspColorContainers { get; set; } = "#FFFFFFCC";
+
+        [JsonPropertyName("espColorExfil")]
+        public string EspColorExfil { get; set; } = "#FF7FFFD4";
+
+        [JsonPropertyName("espColorTripwire")]
+        public string EspColorTripwire { get; set; } = "#FFFF4500";
+
+        [JsonPropertyName("espColorGrenade")]
+        public string EspColorGrenade { get; set; } = "#FFFF5500";
+
+        [JsonPropertyName("espColorCrosshair")]
+        public string EspColorCrosshair { get; set; } = "#FFFFFFFF";
+
+        /// <summary>
+        /// ESP faction color for BEAR PMCs (ESP only, not radar).
+        /// </summary>
+        [JsonPropertyName("espColorFactionBear")]
+        public string EspColorFactionBear { get; set; } = "#FFFF0000";
+        /// <summary>
+        /// ESP faction color for USEC PMCs (ESP only, not radar).
+        /// </summary>
+        [JsonPropertyName("espColorFactionUsec")]
+        public string EspColorFactionUsec { get; set; } = "#FF0000FF";
+
+        /// <summary>
+        /// Radar Max FPS (0 = unlimited). Lowering this can free headroom for ESP.
+        /// </summary>
+        [JsonPropertyName("radarMaxFPS")]
+        public int RadarMaxFPS { get; set; } = 0;
+
+        /// <summary>
+        /// Maximum distance to render players on ESP (in meters). 0 = unlimited.
+        /// </summary>
+        [JsonPropertyName("espPlayerMaxDistance")]
+        public float EspPlayerMaxDistance { get; set; } = 0f;
+
+        /// <summary>
+        /// Maximum distance to render AI/Scavs on ESP (in meters). 0 = unlimited.
+        /// </summary>
+        [JsonPropertyName("espAIMaxDistance")]
+        public float EspAIMaxDistance { get; set; } = 0f;
+
+        /// <summary>
+        /// Maximum distance to render loot on ESP (in meters). 0 = unlimited.
+        /// </summary>
+        [JsonPropertyName("espLootMaxDistance")]
+        public float EspLootMaxDistance { get; set; } = 0f;
+
+        /// <summary>
+        /// Maximum distance to render loot in Aimview (in meters).
+        /// </summary>
+        [JsonPropertyName("aimviewLootRenderDistance")]
+        public float AimviewLootRenderDistance { get; set; } = 25f;
+
+        /// <summary>
+        /// If true, Aimview loot render distance is unlimited (max).
+        /// </summary>
+        [JsonPropertyName("aimviewLootRenderDistanceMax")]
+        public bool AimviewLootRenderDistanceMax { get; set; } = false;
+
+        /// <summary>
+        /// Target screen index for ESP window (0 = Primary, 1+ = Secondary screens).
+        /// </summary>
+        [JsonPropertyName("espTargetScreen")]
+        public int EspTargetScreen { get; set; } = 0;
+
+        /// <summary>
+        /// Position of the name/distance label relative to the bounding box.
+        /// </summary>
+        [JsonPropertyName("espLabelPosition")]
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        public EspLabelPosition EspLabelPosition { get; set; } = EspLabelPosition.Top;
+        /// <summary>
+        /// Position of the AI/scav label relative to the bounding box.
+        /// </summary>
+        [JsonPropertyName("espLabelPositionAI")]
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        public EspLabelPosition EspLabelPositionAI { get; set; } = EspLabelPosition.Top;
+
+        /// <summary>
+        /// Draw a small circle on the head bone for ESP.
+        /// </summary>
+        [JsonPropertyName("espHeadCirclePlayers")]
+        public bool EspHeadCirclePlayers { get; set; } = false;
+        /// <summary>
+        /// Draw a small circle on the head bone for AI/Scavs.
+        /// </summary>
+        [JsonPropertyName("espHeadCircleAI")]
+        public bool EspHeadCircleAI { get; set; } = false;
+    }
+
+    public enum EspLabelPosition
+    {
+        Top,
+        Bottom
+    }
+
+    /// <summary>
+    /// Hotkey input mode - determines where hotkeys are detected from.
+    /// </summary>
+    public enum HotkeyInputMode
+    {
+        /// <summary>
+        /// Hotkeys are detected from the Radar PC keyboard (local machine running the program).
+        /// </summary>
+        RadarPC,
+        /// <summary>
+        /// Hotkeys are detected from the Game PC via DMA (existing behavior).
+        /// </summary>
+        GamePC
     }
 
     public sealed class LootConfig
@@ -559,10 +975,22 @@ namespace LoneEftDmaRadar
         public bool Enabled { get; set; } = true;
 
         /// <summary>
+        /// Show quest items on map/ESP.
+        /// </summary>
+        [JsonPropertyName("showQuestItems")]
+        public bool ShowQuestItems { get; set; } = true;
+
+        /// <summary>
         /// Shows bodies/corpses on map.
         /// </summary>
         [JsonPropertyName("hideCorpses")]
         public bool HideCorpses { get; set; }
+
+        /// <summary>
+        /// Show corpse markers in Radar/Aimview (independent from ESP).
+        /// </summary>
+        [JsonPropertyName("showCorpseMarkers")]
+        public bool ShowCorpseMarkers { get; set; } = false;
 
         /// <summary>
         /// Minimum loot value (rubles) to display 'normal loot' on map.
@@ -589,11 +1017,16 @@ namespace LoneEftDmaRadar
         public LootPriceMode PriceMode { get; set; } = LootPriceMode.FleaMarket;
 
         /// <summary>
-        /// Show loot on the player's wishlist (manual only).
+        /// Show wishlisted items on Radar.
         /// </summary>
-        [JsonPropertyName("showWishlist")]
-        public bool ShowWishlist { get; set; } = false;
+        [JsonPropertyName("showWishlistedRadar")]
+        public bool ShowWishlistedRadar { get; set; } = true;
 
+        /// <summary>
+        /// Color for wishlisted items on Radar.
+        /// </summary>
+        [JsonPropertyName("wishlistColorRadar")]
+        public string WishlistColorRadar { get; set; } = "#FFFF0000";
     }
 
     public sealed class ContainersConfig
@@ -611,10 +1044,22 @@ namespace LoneEftDmaRadar
         public float DrawDistance { get; set; } = 100f;
 
         /// <summary>
+        /// Maximum distance to draw static containers on ESP.
+        /// </summary>
+        [JsonPropertyName("espDrawDistance")]
+        public float EspDrawDistance { get; set; } = 100f;
+
+        /// <summary>
         /// Select all containers.
         /// </summary>
         [JsonPropertyName("selectAll")]
         public bool SelectAll { get; set; } = true;
+
+        /// <summary>
+        /// Hide containers that have been searched by local player.
+        /// </summary>
+        [JsonPropertyName("hideSearched")]
+        public bool HideSearched { get; set; } = false;
 
         /// <summary>
         /// Selected containers to display.
@@ -623,6 +1068,70 @@ namespace LoneEftDmaRadar
         [JsonInclude]
         [JsonConverter(typeof(CaseInsensitiveConcurrentDictionaryConverter<byte>))]
         public ConcurrentDictionary<string, byte> Selected { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Settings for device aimbot integration (DeviceAimbot/KMBox).
+    /// </summary>
+    public sealed class DeviceAimbotConfig
+    {
+        public bool Enabled { get; set; }
+        public bool AutoConnect { get; set; }
+        public string LastComPort { get; set; }
+
+        // Debug
+        public bool ShowDebug { get; set; } = true;
+
+        /// <summary>
+        /// Smoothing factor for DeviceAimbot device aim. 1 = instant, higher = slower/smoother.
+        /// </summary>
+        public float Smoothing { get; set; } = 1.0f;
+
+        // Targeting
+        public Bones TargetBone { get; set; } = Bones.HumanHead;
+        public float FOV { get; set; } = 90f;
+        public float MaxDistance { get; set; } = 300f;
+        public TargetingMode Targeting { get; set; } = TargetingMode.ClosestToCrosshair;
+        public bool EnablePrediction { get; set; } = true;
+
+        // Target Filters
+        public bool TargetPMC { get; set; } = true;
+        public bool TargetPlayerScav { get; set; } = true;
+        public bool TargetAIScav { get; set; } = true;
+        public bool TargetBoss { get; set; } = true;
+        public bool TargetRaider { get; set; } = true;
+
+        // KMBox NET
+        public bool UseKmBoxNet { get; set; } = false;
+        public string KmBoxNetIp { get; set; } = "192.168.2.4";
+        public int KmBoxNetPort { get; set; } = 8888;
+        public string KmBoxNetMac { get; set; } = "";
+
+        // FOV Circle Display
+        public bool ShowFovCircle { get; set; } = true;
+        public string FovCircleColorEngaged { get; set; } = "#FF00FF00"; // Green when engaged
+        public string FovCircleColorIdle { get; set; } = "#80FFFFFF"; // Semi-transparent white when idle
+
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        public enum TargetingMode
+        {
+            ClosestToCrosshair,
+            ClosestDistance
+        }
+    }
+
+    /// <summary>
+    /// Settings for memory write based features.
+    /// </summary>
+    public sealed class MemWritesConfig
+    {
+        public bool Enabled { get; set; }
+        public bool NoRecoilEnabled { get; set; }
+        public float NoRecoilAmount { get; set; } = 80f;
+        public float NoSwayAmount { get; set; } = 80f;
+        public bool InfiniteStaminaEnabled { get; set; }
+        public bool MemoryAimEnabled { get; set; }
+        public Bones MemoryAimTargetBone { get; set; } = Bones.HumanHead;
     }
 
     /// <summary>
@@ -666,6 +1175,60 @@ namespace LoneEftDmaRadar
         [JsonPropertyName("location")]
         [JsonConverter(typeof(SKRectJsonConverter))]
         public SKRect Location { get; set; }
+
+        /// <summary>
+        /// Show loot items in Aimview.
+        /// </summary>
+        [JsonPropertyName("showLoot")]
+        public bool ShowLoot { get; set; } = true;
+
+        /// <summary>
+        /// Show quest items in Aimview.
+        /// </summary>
+        [JsonPropertyName("showQuestItems")]
+        public bool ShowQuestItems { get; set; } = true;
+
+        /// <summary>
+        /// Show AI/Scavs in Aimview.
+        /// </summary>
+        [JsonPropertyName("showAI")]
+        public bool ShowAI { get; set; } = true;
+
+        /// <summary>
+        /// Show enemy players in Aimview.
+        /// </summary>
+        [JsonPropertyName("showEnemyPlayers")]
+        public bool ShowEnemyPlayers { get; set; } = true;
+
+        /// <summary>
+        /// Draw head circles for players and AI in Aimview.
+        /// </summary>
+        [JsonPropertyName("showHeadCircle")]
+        public bool ShowHeadCircle { get; set; } = false;
+
+        /// <summary>
+        /// Show wishlisted items in Aimview.
+        /// </summary>
+        [JsonPropertyName("showWishlisted")]
+        public bool ShowWishlisted { get; set; } = true;
+
+        /// <summary>
+        /// Show static containers in Aimview.
+        /// </summary>
+        [JsonPropertyName("showContainers")]
+        public bool ShowContainers { get; set; } = false;
+
+        /// <summary>
+        /// Maximum distance to draw containers in Aimview. 0 = unlimited.
+        /// </summary>
+        [JsonPropertyName("containerDistance")]
+        public float ContainerDistance { get; set; } = 100f;
+
+        /// <summary>
+        /// Show exfil points in Aimview. Distance is always unlimited (navigation-critical).
+        /// </summary>
+        [JsonPropertyName("showExfils")]
+        public bool ShowExfils { get; set; } = true;
     }
 
     public sealed class InfoWidgetConfig
@@ -684,6 +1247,28 @@ namespace LoneEftDmaRadar
 
         /// <summary>
         /// ESP Widget Location
+        /// </summary>
+        [JsonPropertyName("location")]
+        [JsonConverter(typeof(SKRectJsonConverter))]
+        public SKRect Location { get; set; }
+    }
+
+    public sealed class LootInfoWidgetConfig
+    {
+        /// <summary>
+        /// True if the Loot Info Widget is enabled.
+        /// </summary>
+        [JsonPropertyName("enabled")]
+        public bool Enabled { get; set; } = false;
+
+        /// <summary>
+        /// True if the Loot Info Widget is minimized.
+        /// </summary>
+        [JsonPropertyName("minimized")]
+        public bool Minimized { get; set; } = false;
+
+        /// <summary>
+        /// Loot Info Widget Location
         /// </summary>
         [JsonPropertyName("location")]
         [JsonConverter(typeof(SKRectJsonConverter))]
@@ -773,20 +1358,34 @@ namespace LoneEftDmaRadar
         public string TickRate { get; set; } = "60";
     }
 
+    /// <summary>
+    /// Quest Helper Configuration.
+    /// </summary>
     public sealed class QuestHelperConfig
     {
         /// <summary>
-        /// Enables Quest Helper
+        /// True if the Quest Helper is enabled.
         /// </summary>
         [JsonPropertyName("enabled")]
         public bool Enabled { get; set; } = true;
 
         /// <summary>
-        /// Quests that are overridden/disabled.
+        /// True if Active Only mode is enabled (filters to active quests for current map when in raid).
         /// </summary>
-        [JsonPropertyName("blacklistedQuests")]
+        [JsonPropertyName("activeOnly")]
+        public bool ActiveOnly { get; set; } = false;
+
+        /// <summary>
+        /// Zone draw distance on radar (0 = unlimited).
+        /// </summary>
+        [JsonPropertyName("zoneDrawDistance")]
+        public float ZoneDrawDistance { get; set; } = 100f;
+
+        /// <summary>
+        /// Set of tracked quest IDs.
+        /// </summary>
+        [JsonPropertyName("trackedQuests")]
         [JsonInclude]
-        [JsonConverter(typeof(CaseInsensitiveConcurrentDictionaryConverter<byte>))]
-        public ConcurrentDictionary<string, byte> BlacklistedQuests { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> TrackedQuests { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
     }
 }

@@ -38,7 +38,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Exits
         public Exfil(TarkovDataManager.ExtractElement extract)
         {
             Name = extract.Name;
-            _position = extract.Position;
+            _position = extract.Position.AsVector3();
         }
 
         public string Name { get; }
@@ -49,10 +49,24 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Exits
         public ref readonly Vector3 Position => ref _position;
         public Vector2 MouseoverPosition { get; set; }
 
+        public EStatus Status { get; set; } = EStatus.Open; // Default open for now
+
         public void Draw(SKCanvas canvas, EftMapParams mapParams, LocalPlayer localPlayer)
         {
+            // Skip drawing if closed
+            if (Status == EStatus.Closed)
+                return;
+
             var heightDiff = Position.Y - localPlayer.Position.Y;
-            var paint = SKPaints.PaintExfil;
+            
+            var paint = Status switch
+            {
+                EStatus.Open => SKPaints.PaintExfilOpen,
+                EStatus.Pending => SKPaints.PaintExfilPending,
+                EStatus.Closed => SKPaints.PaintExfilClosed,
+                _ => SKPaints.PaintExfilOpen
+            };
+
             var point = Position.ToMapPos(mapParams.Map).ToZoomedPos(mapParams);
             MouseoverPosition = new Vector2(point.X, point.Y);
             SKPaints.ShapeOutline.StrokeWidth = 2f;
@@ -84,5 +98,12 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Exits
         }
 
         #endregion
+
+        public enum EStatus
+        {
+            Open,
+            Pending,
+            Closed
+        }
     }
 }

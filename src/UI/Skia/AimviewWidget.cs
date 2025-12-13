@@ -16,7 +16,7 @@ furnished to do so, subject to the following conditions:
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESSED OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
@@ -26,26 +26,23 @@ SOFTWARE.
  *
 */
 
-using LoneEftDmaRadar.Tarkov.GameWorld.Loot;
 using LoneEftDmaRadar.Tarkov.GameWorld.Player;
 using LoneEftDmaRadar.Tarkov.GameWorld.Player.Helpers;
+using LoneEftDmaRadar.Tarkov.GameWorld.Exits;
+using LoneEftDmaRadar.Tarkov.GameWorld.Explosives;
+using LoneEftDmaRadar.Tarkov.GameWorld.Loot; // ✅ Add for StaticLootContainer
+using LoneEftDmaRadar.Tarkov.Unity.Structures; // for Bones enum
+using LoneEftDmaRadar.UI.Misc;
 using SkiaSharp.Views.WPF;
+using CameraManagerNew = LoneEftDmaRadar.Tarkov.GameWorld.Camera.CameraManager;
 
 namespace LoneEftDmaRadar.UI.Skia
 {
     public sealed class AimviewWidget : AbstractSKWidget
     {
-        // Constants
-        public const float AimviewBaseStrokeSize = 1.33f;
-        private const float LOOT_RENDER_DISTANCE = 10f;
-        private const float CONTAINER_RENDER_DISTANCE = 10f;
         // Fields
-        private Vector3 _forward, _right, _up, _camPos;
         private SKBitmap _bitmap;
         private SKCanvas _canvas;
-
-        private static IEnumerable<LootItem> FilteredLoot => Memory.Loot?.FilteredLoot;
-        private static IEnumerable<StaticLootContainer> Containers => Memory.Loot?.StaticContainers;
 
         public AimviewWidget(SKGLElement parent, SKRect location, bool minimized, float scale)
             : base(parent, "Aimview",
@@ -59,6 +56,8 @@ namespace LoneEftDmaRadar.UI.Skia
 
         private static LocalPlayer LocalPlayer => Memory.LocalPlayer;
         private static IReadOnlyCollection<AbstractPlayer> AllPlayers => Memory.Players;
+        private static IReadOnlyCollection<IExitPoint> Exits => Memory.Exits;
+        private static IReadOnlyCollection<IExplosiveItem> Explosives => Memory.Explosives;
         private static bool InRaid => Memory.InRaid;
 
         public override void Draw(SKCanvas canvas)
@@ -84,144 +83,452 @@ namespace LoneEftDmaRadar.UI.Skia
                 if (LocalPlayer is not LocalPlayer localPlayer)
                     return;
 
-                // Precompute scale factors once per frame
-                UpdateMatrix(localPlayer);
-
-                if (App.Config.Loot.Enabled)
-                {
-                    DrawLoot(localPlayer);
-                    if (App.Config.Containers.Enabled)
-                        DrawContainers(localPlayer);
-                }
-
-                DrawPlayers(localPlayer);
+                DrawExfils(localPlayer);
+                DrawExplosives(localPlayer);
+                DrawStaticContainers(localPlayer);
+                DrawCorpseMarkers(localPlayer); // ✅ Add corpse marker drawing
+                DrawPlayersAndAIAsSkeletons(localPlayer);
+                DrawFilteredLoot(localPlayer);
                 DrawCrosshair();
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"CRITICAL AIMVIEW WIDGET RENDER ERROR: {ex}");
+                DebugLogger.LogDebug($"CRITICAL AIMVIEW WIDGET RENDER ERROR: {ex}");
             }
 
             _canvas.Flush();
             targetCanvas.DrawBitmap(_bitmap, dest, SKPaints.PaintBitmap);
         }
 
-        private void UpdateMatrix(LocalPlayer localPlayer)
+        // Skeleton connections reused for Aimview
+        private static readonly (Bones From, Bones To)[] _boneConnections = new[]
         {
-            float yaw = localPlayer.Rotation.X * (MathF.PI / 180f);   // horizontal
-            float pitch = localPlayer.Rotation.Y * (MathF.PI / 180f);   // vertical
+            (Bones.HumanHead, Bones.HumanNeck),
+            (Bones.HumanNeck, Bones.HumanSpine3),
+            (Bones.HumanSpine3, Bones.HumanSpine2),
+            (Bones.HumanSpine2, Bones.HumanSpine1),
+            (Bones.HumanSpine1, Bones.HumanPelvis),
+            // Left Arm
+            (Bones.HumanNeck, Bones.HumanLUpperarm),
+            (Bones.HumanLUpperarm, Bones.HumanLForearm1),
+            (Bones.HumanLForearm1, Bones.HumanLForearm2),
+            (Bones.HumanLForearm2, Bones.HumanLPalm),
+            // Right Arm
+            (Bones.HumanNeck, Bones.HumanRUpperarm),
+            (Bones.HumanRUpperarm, Bones.HumanRForearm1),
+            (Bones.HumanRForearm1, Bones.HumanRForearm2),
+            (Bones.HumanRForearm2, Bones.HumanRPalm),
+            // Left Leg
+            (Bones.HumanPelvis, Bones.HumanLThigh1),
+            (Bones.HumanLThigh1, Bones.HumanLThigh2),
+            (Bones.HumanLThigh2, Bones.HumanLCalf),
+            (Bones.HumanLCalf, Bones.HumanLFoot),
+            // Right Leg
+            (Bones.HumanPelvis, Bones.HumanRThigh1),
+            (Bones.HumanRThigh1, Bones.HumanRThigh2),
+            (Bones.HumanRThigh2, Bones.HumanRCalf),
+            (Bones.HumanRCalf, Bones.HumanRFoot),
+        };
 
-            float cy = MathF.Cos(yaw);
-            float sy = MathF.Sin(yaw);
-            float cp = MathF.Cos(pitch);
-            float sp = MathF.Sin(pitch);
+        private void DrawExfils(LocalPlayer localPlayer)
+        {
+            // Controlled by Aimview-specific "Show Exfils" checkbox
+            if (!App.Config.AimviewWidget.ShowExfils)
+                return;
 
-            _forward = new Vector3(
-                sy * cp,   // X
-               -sp,        // Y (up/down tilt)
-                cy * cp    // Z
-            );
-            _forward = Vector3.Normalize(_forward);
+            if (Exits is null)
+                return;
 
-            _right = new Vector3(cy, 0f, -sy);
-            _right = Vector3.Normalize(_right);
+            // Exfils are ALWAYS rendered regardless of distance settings
+            // They are important navigation points and should never be hidden by distance sliders
 
-            _up = Vector3.Normalize(Vector3.Cross(_right, _forward));
+            foreach (var exit in Exits)
+            {
+                if (exit is not Exfil exfil)
+                    continue;
 
-            _up = -_up;
+                if (TryProject(exfil.Position, out var screen, out float scale, localPlayer))
+                {
+                    var paint = SKPaints.PaintExfilOpen;
+                    float distance = Vector3.Distance(localPlayer.Position, exfil.Position);
 
-            _camPos = localPlayer.LookPosition;
+                    // Scale radius with perspective (from TryProject)
+                    float r = Math.Clamp(3f * App.Config.UI.UIScale * scale, 2f, 15f);
+
+                    _canvas.DrawCircle(screen.X, screen.Y, r, paint);
+
+                    // Scale font with perspective
+                    float baseFontSize = SKFonts.EspWidgetFont.Size * scale * 0.9f;
+                    float fontSize = Math.Clamp(baseFontSize, 8f, 20f);
+                    using var font = new SKFont(SKFonts.EspWidgetFont.Typeface, fontSize) { Subpixel = true };
+                    _canvas.DrawText($"{exfil.Name} D:{distance:F0}m", new SKPoint(screen.X + r + 3, screen.Y + r + 1), SKTextAlign.Left, font, SKPaints.TextExfil);
+                }
+            }
         }
 
-        private void DrawPlayers(LocalPlayer localPlayer)
+        private void DrawExplosives(LocalPlayer localPlayer)
         {
+            if (Explosives is null)
+                return;
+
+            // Active explosives (grenades, tripwires) are ALWAYS rendered regardless of loot distance settings
+            // They are safety-critical and should never be hidden by distance sliders
+
+            foreach (var explosive in Explosives)
+            {
+                try
+                {
+                    if (explosive is null || explosive.Position == Vector3.Zero)
+                        continue;
+
+                    if (!TryProject(explosive.Position, out var screen, out float scale, localPlayer))
+                        continue;
+
+                    // Scale radius with perspective (from TryProject)
+                    float r = Math.Clamp(3f * App.Config.UI.UIScale * scale, 2f, 15f);
+
+                    string label;
+                    float distance = Vector3.Distance(localPlayer.Position, explosive.Position);
+                    
+                    if (explosive is Tripwire tripwire && tripwire.IsActive)
+                    {
+                        _canvas.DrawCircle(screen.X, screen.Y, r, SKPaints.PaintExplosives);
+                        label = $"Tripwire D:{distance:F0}m";
+                    }
+                    else if (explosive is Grenade)
+                    {
+                        _canvas.DrawCircle(screen.X, screen.Y, r, SKPaints.PaintExplosives);
+                        label = $"Grenade D:{distance:F0}m";
+                    }
+                    else
+                    {
+                        continue;
+                    }
+
+                    // Scale font with perspective
+                    float baseFontSize = SKFonts.EspWidgetFont.Size * scale * 0.9f;
+                    float fontSize = Math.Clamp(baseFontSize, 8f, 20f);
+                    using var font = new SKFont(SKFonts.EspWidgetFont.Typeface, fontSize) { Subpixel = true };
+                    var textPaint = new SKPaint
+                    {
+                        Color = SKPaints.PaintExplosives.Color,
+                        IsStroke = false,
+                        IsAntialias = true
+                    };
+                    _canvas.DrawText(label, new SKPoint(screen.X + r + 3, screen.Y + r + 1), SKTextAlign.Left, font, textPaint);
+                }
+                catch
+                {
+                    // Skip invalid explosives
+                    continue;
+                }
+            }
+        }
+
+        private void DrawStaticContainers(LocalPlayer localPlayer)
+        {
+            // Controlled by Aimview-specific "Show Containers" checkbox
+            if (!App.Config.AimviewWidget.ShowContainers)
+                return;
+
+            var containers = Memory.Game?.Loot?.AllLoot?.OfType<StaticLootContainer>();
+            if (containers is null)
+                return;
+
+            bool selectAll = App.Config.Containers.SelectAll;
+            var selected = App.Config.Containers.Selected;
+            bool hideSearched = App.Config.Containers.HideSearched;
+            float maxRenderDistance = App.Config.AimviewWidget.ContainerDistance;
+            bool unlimitedDistance = maxRenderDistance <= 0f; // 0 = unlimited
+
+            foreach (var container in containers)
+            {
+                var id = container.ID ?? "UNKNOWN";
+                if (!selectAll && !selected.ContainsKey(id))
+                    continue;
+
+                // Hide searched containers if enabled
+                if (hideSearched && container.Searched)
+                    continue;
+
+                float distance = Vector3.Distance(localPlayer.Position, container.Position);
+                if (!unlimitedDistance && distance > maxRenderDistance)
+                    continue;
+
+                if (TryProject(container.Position, out var screen, out float scale, localPlayer))
+                {
+                    // Scale radius with perspective (from TryProject)
+                    float r = Math.Clamp(3f * App.Config.UI.UIScale * scale, 2f, 15f);
+
+                    var paint = SKPaints.PaintContainerLoot;
+                    _canvas.DrawCircle(screen.X, screen.Y, r, paint);
+
+                    // Scale font with perspective
+                    float baseFontSize = SKFonts.EspWidgetFont.Size * scale * 0.9f;
+                    float fontSize = Math.Clamp(baseFontSize, 8f, 20f);
+                    using var font = new SKFont(SKFonts.EspWidgetFont.Typeface, fontSize) { Subpixel = true };
+                    var textPaint = new SKPaint
+                    {
+                        Color = SKPaints.PaintContainerLoot.Color,
+                        IsStroke = false,
+                        IsAntialias = true
+                    };
+                    _canvas.DrawText(container.Name ?? "Container", new SKPoint(screen.X + r + 3, screen.Y + r + 1), SKTextAlign.Left, font, textPaint);
+                }
+            }
+        }
+
+        private void DrawCorpseMarkers(LocalPlayer localPlayer)
+        {
+            // ✅ Controlled by Radar "Draw Corpse Markers" checkbox
+            if (!App.Config.Loot.ShowCorpseMarkers)
+                return;
+
+            var corpses = Memory.Game?.Loot?.AllLoot?.OfType<LootCorpse>();
+            if (corpses is null)
+                return;
+
+            // Use same distance as Aimview Loot (0 = unlimited)
+            float maxRenderDistance = App.Config.UI.AimviewLootRenderDistance;
+            bool unlimitedDistance = maxRenderDistance <= 0f;
+
+            foreach (var corpse in corpses)
+            {
+                float distance = Vector3.Distance(localPlayer.Position, corpse.Position);
+                if (!unlimitedDistance && distance > maxRenderDistance)
+                    continue;
+
+                if (TryProject(corpse.Position, out var screen, out float scale, localPlayer))
+                {
+                    // Scale radius with perspective (from TryProject)
+                    float r = Math.Clamp(3f * App.Config.UI.UIScale * scale, 2f, 15f);
+
+                    var paint = SKPaints.PaintCorpse;
+                    _canvas.DrawCircle(screen.X, screen.Y, r, paint);
+
+                    // Get corpse name (player name or "Corpse")
+                    var corpseName = corpse.Player?.Name;
+                    var displayName = string.IsNullOrWhiteSpace(corpseName) ? "Corpse" : corpseName;
+
+                    // Scale font with perspective
+                    float baseFontSize = SKFonts.EspWidgetFont.Size * scale * 0.9f;
+                    float fontSize = Math.Clamp(baseFontSize, 8f, 20f);
+                    using var font = new SKFont(SKFonts.EspWidgetFont.Typeface, fontSize) { Subpixel = true };
+                    var textPaint = new SKPaint
+                    {
+                        Color = SKPaints.PaintCorpse.Color,
+                        IsStroke = false,
+                        IsAntialias = true
+                    };
+                    _canvas.DrawText($"{displayName} D:{distance:F0}m", new SKPoint(screen.X + r + 3, screen.Y + r + 1), SKTextAlign.Left, font, textPaint);
+                }
+            }
+        }
+
+        private void DrawPlayersAndAIAsSkeletons(LocalPlayer localPlayer)
+        {
+            if (!App.Config.AimviewWidget.ShowAI && !App.Config.AimviewWidget.ShowEnemyPlayers)
+                return; // Both disabled, skip entirely
+
             var players = AllPlayers?
                 .Where(p => p.IsActive && p.IsAlive && p is not Tarkov.GameWorld.Player.LocalPlayer);
 
             if (players is null)
                 return;
 
-            float minRadius = 1.5f * App.Config.UI.UIScale;
-            float maxRadius = 12f * App.Config.UI.UIScale;
+            bool drawHeadCircles = App.Config.AimviewWidget.ShowHeadCircle;
 
             foreach (var player in players)
             {
-                if (WorldToScreen(in player.Position, out var screen))
+                // Filter based on config
+                bool isAI = player.IsAI;
+                bool isEnemyPlayer = !isAI && player.IsHostile;
+
+                if (isAI && !App.Config.AimviewWidget.ShowAI)
+                    continue;
+                if (isEnemyPlayer && !App.Config.AimviewWidget.ShowEnemyPlayers)
+                    continue;
+
+                float distance = Vector3.Distance(localPlayer.Position, player.Position);
+                if (App.Config.UI.MaxDistance > 0 && distance > App.Config.UI.MaxDistance)
+                    continue;
+
+                // Check if skeleton exists
+                if (player.Skeleton?.BoneTransforms == null)
+                    continue;
+
+                var paint = GetPaint(player);
+
+                // Calculate distance-based scale for line thickness
+                float distanceScale = Math.Clamp(50f / Math.Max(distance, 5f), 0.5f, 2.5f);
+
+                foreach (var (from, to) in _boneConnections)
                 {
-                    float distance = Vector3.Distance(localPlayer.LookPosition, player.Position);
-                    if (distance > App.Config.UI.MaxDistance)
+                    // Use Skeleton.BoneTransforms directly (same as DeviceAimbot) for fresh positions
+                    if (!player.Skeleton.BoneTransforms.TryGetValue(from, out var bone1) ||
+                        !player.Skeleton.BoneTransforms.TryGetValue(to, out var bone2))
                         continue;
 
-                    float radius = Math.Clamp(maxRadius - MathF.Sqrt(distance) * 0.65f, minRadius, maxRadius);
+                    var p1 = bone1.Position;
+                    var p2 = bone2.Position;
+                    
+                    if (p1 == Vector3.Zero || p2 == Vector3.Zero) continue;
+                    if (TryProject(p1, out var s1) && TryProject(p2, out var s2))
+                    {
+                        // Scale line thickness with distance
+                        float t = Math.Max(0.5f, 1.5f * distanceScale);
+                        paint.StrokeWidth = t;
+                        _canvas.DrawLine(s1.X, s1.Y, s2.X, s2.Y, paint);
+                    }
+                }
 
-                    _canvas.DrawCircle(screen, radius, GetPaint(player));
+                // Draw head circle if enabled
+                if (drawHeadCircles && player.Skeleton.BoneTransforms.TryGetValue(Bones.HumanHead, out var headBone))
+                {
+                    var head = headBone.Position;
+                    if (head != Vector3.Zero && !float.IsNaN(head.X) && !float.IsInfinity(head.X))
+                    {
+                        var headTop = head;
+                        headTop.Y += 0.18f; // small offset to estimate head height
+
+                        if (TryProject(head, out var headScreen) && TryProject(headTop, out var headTopScreen))
+                        {
+                            // Calculate radius based on projected head height
+                            var dy = MathF.Abs(headTopScreen.Y - headScreen.Y);
+                            float radius = dy * 0.65f;
+                            radius = Math.Clamp(radius, 2f, 12f);
+                            
+                            // Draw circle (not filled, just outline)
+                            paint.Style = SKPaintStyle.Stroke;
+                            _canvas.DrawCircle(headScreen.X, headScreen.Y, radius, paint);
+                            paint.Style = SKPaintStyle.Fill; // Reset to fill for skeleton lines
+                        }
+                    }
                 }
             }
         }
 
-        private void DrawLoot(LocalPlayer localPlayer)
+        private void DrawFilteredLoot(LocalPlayer localPlayer)
         {
-            if (FilteredLoot is not IEnumerable<LootItem> loot)
-                return;
+            if (!App.Config.AimviewWidget.ShowLoot)
+                return; // Loot disabled in Aimview
 
-            float boxHalf = 4f * ScaleFactor;
+            if (!(App.Config.Loot.Enabled)) return;
+            var lootItems = Memory.Game?.Loot?.FilteredLoot;
+            if (lootItems is null) return;
 
-            foreach (var item in loot)
+            // 0 = unlimited distance
+            float maxDistance = App.Config.UI.AimviewLootRenderDistance <= 0
+                ? float.MaxValue 
+                : App.Config.UI.AimviewLootRenderDistance;
+
+            foreach (var item in lootItems)
             {
-                // Distance squared test first
-                var itemPos = item.Position;
-                var dist = Vector3.Distance(localPlayer.LookPosition, itemPos);
-                if (dist > LOOT_RENDER_DISTANCE)
+                // Skip containers - they're drawn separately in DrawStaticContainers()
+                if (item is StaticLootContainer)
                     continue;
 
-                if (!WorldToScreen(in itemPos, out var scrPos))
+                // Skip corpses - they're drawn separately in DrawCorpseMarkers()
+                if (item is LootCorpse)
                     continue;
 
-                DrawBoxAndLabel(scrPos, boxHalf, $"{item.GetUILabel()} ({dist:n1}m)", SKPaints.PaintAimviewWidgetLoot, SKPaints.TextAimviewWidgetLoot);
+                if (item.IsQuestItem && !App.Config.AimviewWidget.ShowQuestItems)
+                    continue;
+
+                float distance = Vector3.Distance(localPlayer.Position, item.Position);
+                if (distance > maxDistance)
+                    continue;
+
+                if (TryProject(item.Position, out var screen, out float scale, localPlayer))
+                {
+                    // Scale radius with perspective (from TryProject)
+                    float r = Math.Clamp(3f * App.Config.UI.UIScale * scale, 2f, 15f);
+                    
+                    // Determine paint and text paint based on item properties
+                    // Priority: Quest > Wishlist > Category > CustomFilter > Valuable > Default
+                    SKPaint paint;
+                    SKPaint textPaint;
+                    
+                    if (item.IsQuestItem)
+                    {
+                        paint = SKPaints.PaintQuestItem;
+                        textPaint = SKPaints.TextQuestItem;
+                    }
+                    else if (item.IsWishlisted)
+                    {
+                        // Wishlist items use RED color and override custom filters
+                        paint = SKPaints.PaintWishlistItem;
+                        textPaint = SKPaints.TextWishlistItem;
+                    }
+                    else if (item.IsBackpack)
+                    {
+                        paint = SKPaints.PaintBackpacks;
+                        textPaint = SKPaints.TextBackpacks;
+                    }
+                    else if (item.IsMeds)
+                    {
+                        paint = SKPaints.PaintMeds;
+                        textPaint = SKPaints.TextMeds;
+                    }
+                    else if (item.IsFood)
+                    {
+                        paint = SKPaints.PaintFood;
+                        textPaint = SKPaints.TextFood;
+                    }
+                    else
+                    {
+                        // Check for custom filter color
+                        var filterColor = item.CustomFilter?.Color;
+                        if (!string.IsNullOrEmpty(filterColor) && SKColor.TryParse(filterColor, out var skColor))
+                        {
+                            paint = new SKPaint
+                            {
+                                Color = skColor,
+                                StrokeWidth = 0.25f,
+                                Style = SKPaintStyle.Fill,
+                                IsAntialias = true
+                            };
+                            textPaint = new SKPaint
+                            {
+                                Color = skColor,
+                                IsStroke = false,
+                                IsAntialias = true
+                            };
+                        }
+                        else if (item.IsValuableLoot)
+                        {
+                            paint = SKPaints.PaintImportantLoot;
+                            textPaint = SKPaints.TextImportantLoot;
+                        }
+                        else
+                        {
+                            paint = SKPaints.PaintFilteredLoot;
+                            textPaint = SKPaints.TextFilteredLoot;
+                        }
+                    }
+
+                    _canvas.DrawCircle(screen.X, screen.Y, r, paint);
+
+                    // Use GetUILabel() to get consistent label with "!!" prefix for wishlist items
+                    var label = item.GetUILabel();
+                    label = $"{label} D:{distance:F0}m";
+                    
+                    // Scale font with perspective
+                    float baseFontSize = SKFonts.EspWidgetFont.Size * scale * 0.9f;
+                    float fontSize = Math.Clamp(baseFontSize, 8f, 20f);
+                    using var font = new SKFont(SKFonts.EspWidgetFont.Typeface, fontSize) { Subpixel = true };
+                    _canvas.DrawText(label, new SKPoint(screen.X + r + 3, screen.Y + r + 1), SKTextAlign.Left, font, textPaint);
+                }
             }
-        }
-
-        private void DrawContainers(LocalPlayer localPlayer)
-        {
-            if (Containers is not IEnumerable<StaticLootContainer> containers)
-                return;
-
-            float boxHalf = 4f * ScaleFactor;
-
-            foreach (var container in containers)
-            {
-                if (!(MainWindow.Instance?.Settings?.ViewModel?.ContainerIsTracked(container.ID ?? "NULL") ?? false))
-                    continue;
-
-                var cPos = container.Position;
-                var dist = Vector3.Distance(localPlayer.LookPosition, cPos);
-                if (dist > CONTAINER_RENDER_DISTANCE)
-                    continue;
-
-                if (!WorldToScreen(in cPos, out var scrPos))
-                    continue;
-
-                DrawBoxAndLabel(scrPos, boxHalf, $"{container.Name} ({dist:n1}m)", SKPaints.PaintAimviewWidgetLoot, SKPaints.TextAimviewWidgetLoot);
-            }
-        }
-
-        private void DrawBoxAndLabel(SKPoint center, float half, string label, SKPaint boxPaint, SKPaint textPaint)
-        {
-            var rect = new SKRect(center.X - half, center.Y - half, center.X + half, center.Y + half);
-            var textPt = new SKPoint(center.X, center.Y + 12.5f * ScaleFactor);
-
-            _canvas.DrawRect(rect, boxPaint);
-            _canvas.DrawText(label, textPt, SKTextAlign.Left, SKFonts.AimviewWidgetFont, textPaint);
         }
 
         private void DrawCrosshair()
         {
+            // Draw crosshair at widget center
             var bounds = _bitmap.Info.Rect;
-            float centerX = bounds.MidX;
-            float centerY = bounds.MidY;
-
-            _canvas.DrawLine(bounds.Left, centerY, bounds.Right, centerY, SKPaints.PaintAimviewWidgetCrosshair);
-            _canvas.DrawLine(centerX, bounds.Top, centerX, bounds.Bottom, SKPaints.PaintAimviewWidgetCrosshair);
+            var center = new SKPoint(bounds.MidX, bounds.MidY);
+            _canvas.DrawLine(0, center.Y, _bitmap.Width, center.Y, SKPaints.PaintAimviewWidgetCrosshair);
+            _canvas.DrawLine(center.X, 0, center.X, _bitmap.Height, SKPaints.PaintAimviewWidgetCrosshair);
         }
 
         private void EnsureSurface(SKSize size)
@@ -256,8 +563,8 @@ namespace LoneEftDmaRadar.UI.Skia
         public override void SetScaleFactor(float newScale)
         {
             base.SetScaleFactor(newScale);
-            // Paints
-            float std = AimviewBaseStrokeSize * newScale;
+            // Consolidated strokes
+            float std = 1f * newScale;
             SKPaints.PaintAimviewWidgetCrosshair.StrokeWidth = std;
             SKPaints.PaintAimviewWidgetLocalPlayer.StrokeWidth = std;
             SKPaints.PaintAimviewWidgetPMC.StrokeWidth = std;
@@ -269,9 +576,6 @@ namespace LoneEftDmaRadar.UI.Skia
             SKPaints.PaintAimviewWidgetRaider.StrokeWidth = std;
             SKPaints.PaintAimviewWidgetPScav.StrokeWidth = std;
             SKPaints.PaintAimviewWidgetFocused.StrokeWidth = std;
-            SKPaints.PaintAimviewWidgetLoot.StrokeWidth = std;
-            // Fonts
-            SKFonts.AimviewWidgetFont.Size = 9f * newScale;
         }
 
         public override void Dispose()
@@ -302,36 +606,62 @@ namespace LoneEftDmaRadar.UI.Skia
             };
         }
 
-        private bool WorldToScreen(in Vector3 world, out SKPoint scr)
+        // Scale CameraManager coordinates to widget size
+        private bool TryProject(in Vector3 world, out SKPoint scr, out float scale, LocalPlayer localPlayer = null)
         {
             scr = default;
+            scale = 1f;
+            
+            if (world == Vector3.Zero)
+                return false;
+            
+            // Get projection from CameraManager (PR #6 version - no depth output)
+            if (!CameraManagerNew.WorldToScreen(in world, out var espScreen, false, false))
+            {
+                return false;
+            }
 
-            var dir = world - _camPos;
-
-            float dz = Vector3.Dot(dir, _forward);
-            if (dz <= 0f)
+            // Get viewport dimensions from CameraManager
+            var viewport = CameraManagerNew.Viewport;
+            if (viewport.Width <= 0 || viewport.Height <= 0)
                 return false;
 
-            float dx = Vector3.Dot(dir, _right);
-            float dy = Vector3.Dot(dir, _up);
+            // Calculate relative position in viewport (0.0 to 1.0)
+            float relX = espScreen.X / viewport.Width;
+            float relY = espScreen.Y / viewport.Height;
 
-            // Perspective divide
-            float nx = dx / dz;
-            float ny = dy / dz;
+            // Scale to widget dimensions
+            scr = new SKPoint(
+                relX * _bitmap.Width,
+                relY * _bitmap.Height
+            );
 
-            const float PSEUDO_FOV = 1.0f;
-            nx /= PSEUDO_FOV;
-            ny /= PSEUDO_FOV;
+            // Calculate scale based on distance from PLAYER (not camera) for better scaling effect
+            Vector3 refPos = localPlayer?.Position ?? CameraManagerNew.CameraPosition;
+            float dist = Vector3.Distance(refPos, world);
+            
+            // ✅ Perspective-based scaling - markers get SMALLER at greater distances (natural view)
+            // At close range (5m): scale ~2.0x (larger, more visible)
+            // At medium range (10m): scale ~1.0x (normal size)  
+            // At far range (30m+): scale ~0.33x (smaller, less obtrusive)
+            const float referenceDistance = 10f; // Reference distance for 1.0x scale
+            scale = Math.Clamp(referenceDistance / Math.Max(dist, 1f), 0.3f, 3f);
+            
+            // Check if within widget bounds (allow some tolerance for edge cases)
+            const float tolerance = 100f;
+            if (scr.X < -tolerance || scr.X > _bitmap.Width + tolerance || 
+                scr.Y < -tolerance || scr.Y > _bitmap.Height + tolerance)
+            {
+                return false;
+            }
 
-            float w = _bitmap.Width;
-            float h = _bitmap.Height;
-
-            scr.X = w * 0.5f + nx * (w * 0.5f);
-            scr.Y = h * 0.5f - ny * (h * 0.5f);
-
-            return !(scr.X < 0 || scr.X > w || scr.Y < 0 || scr.Y > h);
+            return true;
         }
 
-
+        // Overload without scale for compatibility
+        private bool TryProject(in Vector3 world, out SKPoint scr)
+        {
+            return TryProject(world, out scr, out _, null);
+        }
     }
 }

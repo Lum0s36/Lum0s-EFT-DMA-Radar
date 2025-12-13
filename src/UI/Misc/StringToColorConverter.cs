@@ -53,7 +53,14 @@ namespace LoneEftDmaRadar.UI.Misc
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
             if (value is Color c)
+            {
+                // If alpha is 0, set it to 255 (fully opaque)
+                if (c.A == 0)
+                {
+                    c = Color.FromArgb(255, c.R, c.G, c.B);
+                }
                 return c.ToString();  // e.g. "#FFAABBCC"
+            }
             return string.Empty;
         }
     }

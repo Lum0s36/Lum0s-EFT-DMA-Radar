@@ -27,6 +27,7 @@ SOFTWARE.
 */
 
 using LoneEftDmaRadar.UI.Radar.ViewModels;
+using System.Windows;
 using System.Windows.Controls;
 
 namespace LoneEftDmaRadar.UI.Radar.Views
@@ -41,6 +42,55 @@ namespace LoneEftDmaRadar.UI.Radar.Views
         {
             InitializeComponent();
             DataContext = ViewModel = new SettingsViewModel(this);
+            
+            // Subscribe to toggle button events
+            BtnLootFilters.Checked += UpdateLayout;
+            BtnLootFilters.Unchecked += UpdateLayout;
+            BtnStaticContainers.Checked += UpdateLayout;
+            BtnStaticContainers.Unchecked += UpdateLayout;
+            
+            // Set initial layout state
+            UpdateLayout(null, null);
         }
+
+        private void UpdateLayout(object sender, RoutedEventArgs e)
+        {
+            bool lootFiltersChecked = BtnLootFilters.IsChecked == true;
+            bool containersChecked = BtnStaticContainers.IsChecked == true;
+
+            if (lootFiltersChecked && containersChecked)
+            {
+                // Both checked: split view (50/50)
+                LootFiltersBorder.SetValue(Grid.ColumnProperty, 0);
+                LootFiltersBorder.SetValue(Grid.ColumnSpanProperty, 1);
+                ContainersBorder.SetValue(Grid.ColumnProperty, 2);
+                ContainersBorder.SetValue(Grid.ColumnSpanProperty, 1);
+                SplitterColumn.Width = new GridLength(5);
+            }
+            else if (lootFiltersChecked)
+            {
+                // Only Loot Filters: full width
+                LootFiltersBorder.SetValue(Grid.ColumnProperty, 0);
+                LootFiltersBorder.SetValue(Grid.ColumnSpanProperty, 3);
+                ContainersBorder.SetValue(Grid.ColumnProperty, 2);
+                ContainersBorder.SetValue(Grid.ColumnSpanProperty, 1);
+                SplitterColumn.Width = new GridLength(0);
+            }
+            else if (containersChecked)
+            {
+                // Only Static Containers: full width
+                ContainersBorder.SetValue(Grid.ColumnProperty, 0);
+                ContainersBorder.SetValue(Grid.ColumnSpanProperty, 3);
+                LootFiltersBorder.SetValue(Grid.ColumnProperty, 0);
+                LootFiltersBorder.SetValue(Grid.ColumnSpanProperty, 1);
+                SplitterColumn.Width = new GridLength(0);
+            }
+            else
+            {
+                // Both unchecked: hide splitter
+                SplitterColumn.Width = new GridLength(0);
+            }
+        }
+
     }
 }

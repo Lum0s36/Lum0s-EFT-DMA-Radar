@@ -1,6 +1,7 @@
-﻿using LoneEftDmaRadar.Tarkov.Unity;
+﻿using LoneEftDmaRadar.DMA;
+using LoneEftDmaRadar.Tarkov.Unity;
 using LoneEftDmaRadar.Tarkov.Unity.Structures;
-using VmmSharpEx.Extensions;
+using LoneEftDmaRadar.UI.Misc;
 
 namespace LoneEftDmaRadar.Tarkov.GameWorld
 {
@@ -17,13 +18,13 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
         public static ulong GetGameWorld(this GameObjectManager gom, CancellationToken ct, out string map)
         {
             ct.ThrowIfCancellationRequested();
-            Debug.WriteLine("Searching for GameWorld...");
+            DebugLogger.LogDebug("Searching for GameWorld...");
             var firstObject = Memory.ReadValue<LinkedListObject>(gom.ActiveNodes);
             var lastObject = Memory.ReadValue<LinkedListObject>(gom.LastActiveNode);
-            firstObject.ThisObject.ThrowIfInvalidUserVA(nameof(firstObject));
-            firstObject.NextObjectLink.ThrowIfInvalidUserVA(nameof(firstObject));
-            lastObject.ThisObject.ThrowIfInvalidUserVA(nameof(lastObject));
-            lastObject.PreviousObjectLink.ThrowIfInvalidUserVA(nameof(lastObject));
+            firstObject.ThisObject.ThrowIfInvalidVirtualAddress(nameof(firstObject));
+            firstObject.NextObjectLink.ThrowIfInvalidVirtualAddress(nameof(firstObject));
+            lastObject.ThisObject.ThrowIfInvalidVirtualAddress(nameof(lastObject));
+            lastObject.PreviousObjectLink.ThrowIfInvalidVirtualAddress(nameof(lastObject));
 
             using var cts = new CancellationTokenSource();
             try
@@ -71,7 +72,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
                     var gom = GameObjectManager.Get();
                     var currentObject = Memory.ReadValue<LinkedListObject>(gom.ActiveNodes);
                     int iterations = 0;
-                    while (currentObject.ThisObject.IsValidUserVA())
+                    while (currentObject.ThisObject.IsValidVirtualAddress())
                     {
                         ct1.ThrowIfCancellationRequested();
                         ct2.ThrowIfCancellationRequested();
@@ -79,7 +80,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
                             break;
                         if (ParseGameWorld(ref currentObject) is GameWorldResult result)
                         {
-                            Debug.WriteLine("GameWorld Found! (Shallow)");
+                            DebugLogger.LogDebug("GameWorld Found! (Shallow)");
                             return result;
                         }
 
@@ -99,7 +100,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
                 ct2.ThrowIfCancellationRequested();
                 if (ParseGameWorld(ref currentObject) is GameWorldResult result)
                 {
-                    Debug.WriteLine("GameWorld Found! (Forward)");
+                    DebugLogger.LogDebug("GameWorld Found! (Forward)");
                     return result;
                 }
 
@@ -116,7 +117,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
                 ct2.ThrowIfCancellationRequested();
                 if (ParseGameWorld(ref currentObject) is GameWorldResult result)
                 {
-                    Debug.WriteLine("GameWorld Found! (Backward)");
+                    DebugLogger.LogDebug("GameWorld Found! (Backward)");
                     return result;
                 }
 
@@ -129,7 +130,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
         {
             try
             {
-                currentObject.ThisObject.ThrowIfInvalidUserVA(nameof(currentObject));
+                currentObject.ThisObject.ThrowIfInvalidVirtualAddress(nameof(currentObject));
                 var objectNamePtr = Memory.ReadPtr(currentObject.ThisObject + UnitySDK.UnityOffsets.GameObject_NameOffset);
                 var objectNameStr = Memory.ReadUtf8String(objectNamePtr, 64);
                 if (objectNameStr.Equals("GameWorld", StringComparison.OrdinalIgnoreCase))
@@ -145,9 +146,9 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
                             mapPtr = Memory.ReadPtr(localPlayer + Offsets.Player.Location);
                         }
 
-                        string map = Memory.ReadUnityString(mapPtr, 128);
-                        Debug.WriteLine("Detected Map " + map);
-                        if (!TarkovDataManager.MapData.ContainsKey(map)) // Also makes sure we're not in the hideout
+                        string map = Memory.ReadUnicodeString(mapPtr, 128);
+                        DebugLogger.LogDebug("Detected Map " + map);
+                        if (!StaticGameData.MapNames.ContainsKey(map)) // Also makes sure we're not in the hideout
                             throw new ArgumentException("Invalid Map ID!");
                         return new GameWorldResult()
                         {
@@ -157,7 +158,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"Invalid GameWorld Instance: {ex}");
+                        DebugLogger.LogDebug($"Invalid GameWorld Instance: {ex}");
                     }
                 }
             }

@@ -1,31 +1,84 @@
-# Lone EFT DMA Radar
-<img width="512" height="512" alt="image" src="https://github.com/user-attachments/assets/dc52d50b-66dd-4a9d-bbf2-c7d9b8c24aba" />
+# Lum0s36's EFT DMA Radar
 
-## ⚠️ IMPORTANT Read First
-I have since changed Lone EFT DMA Radar to be **READ-ONLY** and **RADAR-ONLY**.
+### README (please)
 
-If you are looking for the old **FULL FEATURED** version of Lone EFT DMA, it is now being maintained by [DMA Educational Resources](https://github.com/dma-educational-resources/eft-dma-radar).
+This repository and it's code serve as educational resource only. Use with caution and make yourself familiar with the code before use.
 
-No feature requests in Issues please.
+Fork of Lone EFT DMA Radar with additional ESP, aimbot, and memory-write features.
 
-## 👋 Welcome
-This is the original Lone EFT DMA Radar by Lone, with some key differences from the original version:
-1. **Radar Only/No Memwrites.**
-3. New & Improved WPF User Interface.
+## AI WARNING ⚠️
+Commits in this Fork (Lum0s36) are mainly AI generated and changes are not always tested right away. Please check the code first if you're unsure.
 
-This version is designed to be as safe as possible from any future detections, and gives you the information that you need while allowing you to fully experience the game for yourself.
+## Disclaimer ⚠️  
+This app has been tested on 🪟 Windows 11 25H2 (Game) and 🪟 Windows 11 23H2 (Radar).  
+⚠️ Older versions of Windows (e.g., Windows 10) may not work properly and are not officially supported.
 
-## 💾 Setup
-- Download the latest version in [Releases](https://github.com/lone-dma/Lone-EFT-DMA-Radar/releases).
-- See our [Setup Files and Guides](https://github.com/lone-dma/Lone-EFT-DMA-Radar/releases/tag/setup).
+**Note:** All current testing is done with both the radar and game running at **1920x1080** resolution.  
 
-## 💸 Donations
-If you find this software useful, _please_ consider donating! Every little bit helps :) [See here for Donations Info](https://github.com/lone-dma#-support-the-project)
- 
-## 💖 Special Thanks
-- @xx0m and @Mambo-Noob
-  - For keeping the DER Community running, and doing an awesome job keeping the other eft-dma-radar fork maintained. Thank you!
-- Marazm
-  - For your hard work on maps, and your willingness to contribute them to the open domain. Thank you!
-- Keegi
-  - For your helpful insights on Unity/IL2CPP Reversing. Thank you!
+## Things I won't touch unless Mambo/x0m made it open source
+- writing
+
+## Features that are to be added in future commits ⌨️
+
+- Lootfilter and Important/Wishlist items on AI (and PMC?) gear slots indicated by either "!!" or the exact name (short)
+- Exfils show if opened, pending or closed
+- Quest tracker including zones, req. Keys and Items and only Q_items of active quests on radar/ESP/Aimview
+- ...?
+
+## Known Issues 🚨
+
+- ESP and Aimview Head Circles are not handled (and are not code-wise) part of the skeleton and don't scale like you'd expect them to.
+
+## Features ✨
+
+- Configurable Aimview widget
+- Loot Info widget
+- 🛰️ ESP Fuser DX9 overlay
+   - ESP has issues, especially when ADS and using optics. Work in progress 🛠
+- 🎯 Device Aimbot / Kmbox integration
+- 🕵️‍♂️ Silent aim (memory aim)
+- 💪 No recoil, no sway, and infinite stamina
+- 🧼 Clean UI
+
+## Config File 📄
+
+This Chair creates it's own Config folder to be distinguishable from other config folders.
+- File location: C:\User\AppData\Roaming\Lum0s-EFT-DMA
+- File name: Config-EFT.json
+- Don't have a file with pre set Lootfilters and Watchlist? There's one in Master
+
+##  Common Issues ⚠️
+
+### DX Overlay/D3DX Errors ("DX overlay init failed", "ESP DX init failed: System.DllNotFoundException: Unable to load DLL 'd3dx943.dll'...")
+
+If you see an error like:
+
+```
+DX overlay init failed
+
+ESP DX init failed: System.DllNotFoundException: Unable to load DLL 'd3dx943.dll' or one of its dependencies: The specified module could not be found
+```
+
+This means your PC does **not** have the required legacy DirectX 9 *D3DX* runtime (specifically `d3dx9_43.dll`). Modern Windows installs (Windows 10/11) **do not include** this file by default.
+
+**How to fix:**
+
+1. **On your Radar PC**, download and run Microsoft’s official installer:
+
+   👉 [DirectX End-User Runtime (June 2010)
+   > Installing either of these will add the required DirectX 9 component (`d3dx9_43.dll`) and several others needed by the overlay.
+
+2. **Follow the install prompts** to complete setup.
+
+3. **Restart the radar app.** A full PC reboot may help but is usually not required.
+
+**Do NOT** attempt to download `d3dx9_43.dll` from random third-party DLL sites. Use only Microsoft’s official installer.
+
+
+##  Contributing 🤝
+
+Send PRs if you wish to participate. Contributions are welcome!
+
+- Please fork the repository and create pull requests for features or fixes.
+- Test your changes before submitting a PR.
+- If you are submitting a significant change, consider opening an issue to discuss it first.

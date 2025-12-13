@@ -5,6 +5,9 @@
              xmlns:vm="clr-namespace:LoneEftDmaRadar.UI.Radar.ViewModels"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:misc="clr-namespace:LoneEftDmaRadar.UI.Misc"
+             xmlns:converters="clr-namespace:LoneEftDmaRadar.UI.Converters"
+             xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
              mc:Ignorable="d"
              Padding="10">
 
@@ -13,17 +16,18 @@
                           IsDesignTimeCreatable="False" />
     </d:UserControl.DataContext>
 
+    <UserControl.Resources>
+        <misc:TwoPaneWidthConverter x:Key="TwoPaneWidthConverter" />
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <converters:InverseBooleanConverter x:Key="InverseBoolConverter" />
+        <misc:StringToColorConverter x:Key="StringToColorConverter" />
+    </UserControl.Resources>
+
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Orientation="Vertical"
                     Margin="0,0,0,10">
-            <!-- About Info -->
-            <TextBlock 
-                TextWrapping="Wrap" 
-                FontSize="16">ℹ️ Get the latest version at <Hyperlink Command="{Binding AboutUrlCommand}">lone-dma.org</Hyperlink>
-            </TextBlock>
-
-            <!-- Radar / General Settings -->
-            <GroupBox Header="Radar / General Settings"
+            <!-- Radar Settings -->
+            <GroupBox Header="Radar Settings"
                       Margin="0,0,0,12">
                 <StackPanel>
 
@@ -41,13 +45,6 @@ Toggle Fullscreen: F11
                         <Button Content="Restart Radar"
                                 ToolTip="Restarts the Radar for the current raid instance. Can be useful if stuck on 'waiting for raid start' or the raid is not functioning properly."
                                 Command="{Binding RestartRadarCommand}"
-                                MinWidth="100"
-                                Height="35"
-                                Margin="0,0,8,8" />
-                        <Button Content="Hotkey Manager"
-                                ToolTip="Opens the Hotkey Manager. This is used to create Custom Hotkeys that can be pressed IN GAME to control the Radar Application."
-                                IsEnabled="{Binding HotkeyManagerIsEnabled}"
-                                Command="{Binding OpenHotkeyManagerCommand}"
                                 MinWidth="100"
                                 Height="35"
                                 Margin="0,0,8,8" />
@@ -77,44 +74,6 @@ Toggle Fullscreen: F11
                         <StackPanel Orientation="Horizontal"
                                     VerticalAlignment="Center"
                                     Margin="0,0,16,8">
-                            <TextBlock Text="Aimline Length"
-                                       VerticalAlignment="Center"
-                                       ToolTip="Sets the Aimline Length for Local Player/Teammates" />
-                            <Slider x:Name="AimlineLengthSlider"
-                                    Width="150"
-                                    Margin="8,0"
-                                    Minimum="0"
-                                    Maximum="1500"
-                                    SmallChange="1"
-                                    LargeChange="10"
-                                    Value="{Binding AimlineLength, Mode=TwoWay}" />
-                            <TextBlock Text="{Binding Value, ElementName=AimlineLengthSlider}"
-                                       VerticalAlignment="Center"
-                                       Margin="8,0,0,0" />
-                        </StackPanel>
-
-                        <StackPanel Orientation="Horizontal"
-                                    VerticalAlignment="Center"
-                                    Margin="0,0,16,8">
-                            <TextBlock Text="Max Distance"
-                                       VerticalAlignment="Center"
-                                       ToolTip="Sets the 'Maximum Distance' for the Radar and many of its features. This will affect Hostile Aimlines, and Aimview. In most cases you don't need to set this over 500." />
-                            <Slider x:Name="MaxDistSlider"
-                                    Width="150"
-                                    Margin="8,0"
-                                    Minimum="10"
-                                    Maximum="1500"
-                                    SmallChange="1"
-                                    LargeChange="10"
-                                    Value="{Binding MaxDistance, Mode=TwoWay}" />
-                            <TextBlock Text="{Binding Value, ElementName=MaxDistSlider}"
-                                       VerticalAlignment="Center"
-                                       Margin="8,0,0,0" />
-                        </StackPanel>
-
-                        <StackPanel Orientation="Horizontal"
-                                    VerticalAlignment="Center"
-                                    Margin="0,0,16,8">
                             <TextBlock Text="UI Scale"
                                        VerticalAlignment="Center"
                                        ToolTip="Sets the scaling factor for the Radar/User Interface. For high‑resolution monitors you may want to increase this." />
@@ -134,19 +93,62 @@ Toggle Fullscreen: F11
                         <StackPanel Orientation="Horizontal"
                                     VerticalAlignment="Center"
                                     Margin="0,0,16,8">
-                            <TextBlock Text="Container Distance"
+                            <TextBlock Text="Radar Max FPS (0 = Unlimited)"
                                        VerticalAlignment="Center" />
-                            <Slider x:Name="ContainerDistSlider"
+                            <Slider x:Name="RadarFpsSlider"
+                                    Width="180"
+                                    Margin="8,0"
+                                    Minimum="0"
+                                    Maximum="240"
+                                    SmallChange="5"
+                                    LargeChange="15"
+                                    TickFrequency="15"
+                                    IsSnapToTickEnabled="True"
+                                    Value="{Binding RadarMaxFPS, Mode=TwoWay}" />
+                            <TextBlock Text="{Binding Value, ElementName=RadarFpsSlider, StringFormat='{}{0:F0}'}"
+                                       VerticalAlignment="Center"
+                                       Margin="8,0,0,0" />
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal"
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,16,8">
+                            <TextBlock Text="Aimline Length (0 = Unlimited)"
+                                       VerticalAlignment="Center"
+                                       ToolTip="Sets the length of the aimline for the local player. 0 = Unlimited." />
+                            <Slider x:Name="AimlineLengthSlider"
                                     Width="150"
                                     Margin="8,0"
                                     Minimum="0"
-                                    Maximum="200"
-                                    SmallChange="1"
-                                    LargeChange="10"
-                                    Value="{Binding ContainerDistance, Mode=TwoWay}" />
-                            <TextBlock Text="{Binding Value, ElementName=ContainerDistSlider}"
+                                    Maximum="600"
+                                    SmallChange="10"
+                                    LargeChange="50"
+                                    Value="{Binding AimlineLength, Mode=TwoWay}" />
+                            <TextBlock Text="{Binding Value, ElementName=AimlineLengthSlider, StringFormat='{}{0:F0}'}"
                                        VerticalAlignment="Center"
-                                       Margin="8,0,0,0" />
+                                       Margin="8,0,0,0"
+                                       MinWidth="40" />
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal"
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,16,8"
+                                    IsEnabled="{Binding TeammateAimlines}">
+                            <TextBlock Text="Teammate Aimline Length (0 = Same as Player)"
+                                       VerticalAlignment="Center"
+                                       ToolTip="Sets the length of the aimline for teammates. 0 = Same as local player. Only active when 'Teammate Aimlines' is enabled." />
+                            <Slider x:Name="TeammateAimlineLengthSlider"
+                                    Width="150"
+                                    Margin="8,0"
+                                    Minimum="0"
+                                    Maximum="600"
+                                    SmallChange="10"
+                                    LargeChange="50"
+                                    Value="{Binding TeammateAimlineLength, Mode=TwoWay}" />
+                            <TextBlock Text="{Binding Value, ElementName=TeammateAimlineLengthSlider, StringFormat='{}{0:F0}'}"
+                                       VerticalAlignment="Center"
+                                       Margin="8,0,0,0"
+                                       MinWidth="40" />
                         </StackPanel>
                     </WrapPanel>
 
@@ -164,6 +166,10 @@ Toggle Fullscreen: F11
                                   ToolTip="Toggles the Player Info 'Widget' that gives you information about the players/bosses in your raid. Can be moved."
                                   IsChecked="{Binding PlayerInfoWidget, Mode=TwoWay}"
                                   Margin="0,0,16,8" />
+                        <CheckBox Content="Loot Info Widget"
+                                  ToolTip="Toggles the Loot Info 'Widget' that shows all loot items sorted by value in a table. Can be moved."
+                                  IsChecked="{Binding LootInfoWidget, Mode=TwoWay}"
+                                  Margin="0,0,16,8" />
                         <CheckBox Content="Connect Groups"
                                   ToolTip="Connects players that are grouped up via semi‑transparent green lines. Does not apply to your own party."
                                   IsChecked="{Binding ConnectGroups, Mode=TwoWay}"
@@ -172,9 +178,8 @@ Toggle Fullscreen: F11
                                   ToolTip="Hides human player names from displaying in the Radar or Player Info Widget. Instead will show the (Height,Distance)."
                                   IsChecked="{Binding HideNames, Mode=TwoWay}"
                                   Margin="0,0,16,8" />
-                        <CheckBox Content="Show Hazards"
-                                  ToolTip="When enabled shows map hazards (mines, snipers, etc.) where you should avoid that map area."
-                                  IsChecked="{Binding ShowHazards, Mode=TwoWay}"
+                        <CheckBox Content="Show Mines"
+                                  IsChecked="{Binding ShowMines, Mode=TwoWay}"
                                   Margin="0,0,16,8" />
                         <CheckBox Content="Teammate Aimlines"
                                   ToolTip="When enabled makes teammate aimlines the same length as the main player."
@@ -187,11 +192,7 @@ Toggle Fullscreen: F11
                         <CheckBox Content="Mark Sus Players"
                                   ToolTip="Marks players as suspicious based on certain criteria (K/D, S/R, etc.)"
                                   IsChecked="{Binding MarkSusPlayers, Mode=TwoWay}"
-                                  Margin="0,0,16,8" />
-                        <CheckBox Content="Show Exfils"
-                              ToolTip="Toggle rendering Exfils/Transits on map."
-                              IsChecked="{Binding ShowExfils, Mode=TwoWay}"
-                              Margin="0,0,0,8" />
+                                  Margin="0,0,0,8" />
                     </WrapPanel>
 
                 </StackPanel>
@@ -206,92 +207,194 @@ Toggle Fullscreen: F11
                                   ToolTip="Toggles displaying Loot on the Radar/ESP."
                                   IsChecked="{Binding ShowLoot, Mode=TwoWay}"
                                   Margin="0,0,16,8" />
-                        <CheckBox Content="Show Loot Wishlist"
-                                  ToolTip="Tracks loot on your account's Loot Wishlist (Manual Adds Only, does not work for Automatically Added Items)."
-                                  IsChecked="{Binding LootWishlist, Mode=TwoWay}"
-                                  Margin="0,0,16,8" />
                         <CheckBox Content="Show Static Containers"
-                                  ToolTip="Shows static containers on the map. Due to recent Tarkov Anti‑Cheat Measures, you cannot see what the contents are however."
+                                  ToolTip="Shows static containers on the Radar map."
                                   IsChecked="{Binding ShowStaticContainers, Mode=TwoWay}"
-                                  Margin="0,0,16,8" />
+                                  Margin="0,0,8,8" />
+                        <Button Content="⟳ Set Global"
+                                ToolTip="Apply this setting to Aimview and ESP"
+                                Command="{Binding SetContainersGlobalCommand}"
+                                MinWidth="90"
+                                Height="28"
+                                Margin="0,0,16,8" />
+                        <CheckBox Content="Draw Corpse Markers"
+                                  ToolTip="Shows corpse markers on Radar and Aimview (independent from ESP)."
+                                  IsChecked="{Binding ShowCorpseMarkers, Mode=TwoWay}"
+                                  Margin="0,0,0,8" />
                     </WrapPanel>
 
-                    <GroupBox Header="Static Containers"
-                              Margin="10,0,0,0"
-                              IsEnabled="{Binding ShowStaticContainers}">
-                        <StackPanel Margin="0,4,0,0">
-                            <WrapPanel Margin="0,0,0,8">
-                                <CheckBox Content="Select All"
-                                          ToolTip="Selects all container types for display on the map."
-                                          IsChecked="{Binding StaticContainersSelectAll, Mode=TwoWay}"
-                                          Margin="0,0,16,8" />
-                            </WrapPanel>
+                    <StackPanel Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                Margin="0,0,16,8"
+                                IsEnabled="{Binding ShowStaticContainers}">
+                        <TextBlock Text="Container Distance (0 = Unlimited)"
+                                   VerticalAlignment="Center" />
+                        <Slider x:Name="ContainerDistSlider"
+                                Width="150"
+                                Margin="8,0"
+                                Minimum="0"
+                                Maximum="200"
+                                SmallChange="1"
+                                LargeChange="10"
+                                Value="{Binding ContainerDistance, Mode=TwoWay}" />
+                        <TextBlock Text="{Binding Value, ElementName=ContainerDistSlider}"
+                                   VerticalAlignment="Center"
+                                   Margin="8,0,0,0" />
+                        <Button Content="⟳ Set Global"
+                                ToolTip="Apply this distance to Aimview and ESP"
+                                Command="{Binding SetContainerDistanceGlobalCommand}"
+                                MinWidth="90"
+                                Height="28"
+                                Margin="8,0,0,0" />
+                    </StackPanel>
 
-                            <TextBlock Text="Tracked Containers"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,4,8" />
+                    <!-- Header buttons (static size, side by side) -->
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,6">
+                        <ToggleButton x:Name="BtnLootFilters" Content="Loot Filters" MinWidth="140" Height="28" Margin="0,0,8,0" IsChecked="False" />
+                        <ToggleButton x:Name="BtnStaticContainers" Content="Static Containers" MinWidth="160" Height="28" IsChecked="False" />
+                    </StackPanel>
 
-                            <ListBox ItemsSource="{Binding StaticContainers}"
-                                     Height="250"
-                                     ScrollViewer.CanContentScroll="True">
-                                <!-- Use a VirtualizingStackPanel as the items host -->
-                                <ListBox.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <VirtualizingStackPanel IsVirtualizing="True"
-                                                                VirtualizationMode="Recycling" />
-                                    </ItemsPanelTemplate>
-                                </ListBox.ItemsPanel>
+                    <!-- Loot management panels - split view when both are checked -->
+                    <Grid x:Name="LootPanelsGrid">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition x:Name="LootFiltersColumn" Width="*" />
+                            <ColumnDefinition x:Name="SplitterColumn" Width="5" />
+                            <ColumnDefinition x:Name="ContainersColumn" Width="*" />
+                        </Grid.ColumnDefinitions>
 
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <CheckBox Content="{Binding Name}"
-                                                  IsChecked="{Binding IsTracked, Mode=TwoWay}" />
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                        </StackPanel>
-                    </GroupBox>
+                        <!-- Loot Filters panel -->
+                        <Border x:Name="LootFiltersBorder"
+                                Grid.Column="0"
+                                Visibility="{Binding ElementName=BtnLootFilters, Path=IsChecked, Converter={StaticResource BoolToVis}}">
+                            <local:LootFiltersTab />
+                        </Border>
+
+                        <!-- Splitter (only visible when both are checked) -->
+                        <GridSplitter x:Name="LootSplitter"
+                                      Grid.Column="1"
+                                      HorizontalAlignment="Stretch"
+                                      VerticalAlignment="Stretch"
+                                      Width="5"
+                                      Background="LightGray"
+                                      ResizeDirection="Columns"
+                                      ShowsPreview="False">
+                            <GridSplitter.Style>
+                                <Style TargetType="GridSplitter">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding ElementName=BtnLootFilters, Path=IsChecked}" Value="True" />
+                                                <Condition Binding="{Binding ElementName=BtnStaticContainers, Path=IsChecked}" Value="True" />
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </GridSplitter.Style>
+                        </GridSplitter>
+
+                        <!-- Static Containers panel -->
+                        <Border x:Name="ContainersBorder"
+                                Grid.Column="2"
+                                Visibility="{Binding ElementName=BtnStaticContainers, Path=IsChecked, Converter={StaticResource BoolToVis}}">
+                            <local:StaticContainersTab />
+                        </Border>
+                    </Grid>
 
                 </StackPanel>
             </GroupBox>
 
-            <!-- Quest Helper -->
-            <GroupBox Header="Quest Helper"
+            <!-- Aimview ESP -->
+            <GroupBox Header="Aimview ESP"
                       Margin="0,0,0,12">
-                <DockPanel LastChildFill="True"
-                           Margin="0,4,0,0">
-                    <CheckBox Content="Enabled"
-                              ToolTip="Toggles the Quest Helper feature. This will display Items and Zones that you need to pickup/visit for quests that you currently have active."
-                              IsChecked="{Binding QuestHelperEnabled, Mode=TwoWay}"
-                              DockPanel.Dock="Left"
-                              Margin="0,0,8,0" />
-                    <TextBlock Text="Tracked Quests"
-                               VerticalAlignment="Center"
-                               Margin="0,0,4,8" />
-                    <ListBox ItemsSource="{Binding CurrentQuests}"
-                             IsEnabled="{Binding QuestHelperEnabled}"
-                             Height="250"
-                             ToolTip="Active Quest List (populates once you are in raid). Uncheck a quest to untrack it."
-                             ScrollViewer.CanContentScroll="True">
+                <StackPanel>
+                    <TextBlock TextWrapping="Wrap"
+                               Margin="0,0,0,12"
+                               FontStyle="Italic">
+Configure what entities are rendered in the Aimview widget.
+                    </TextBlock>
 
-                        <!-- 1) Define the panel *with* virtualization baked in -->
-                        <ListBox.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <VirtualizingStackPanel VirtualizingStackPanel.IsVirtualizing="True"
-                                                        VirtualizingStackPanel.VirtualizationMode="Recycling"
-                                                        IsItemsHost="True" />
-                            </ItemsPanelTemplate>
-                        </ListBox.ItemsPanel>
+                    <WrapPanel>
+                        <CheckBox Content="Show Loot"
+                                  ToolTip="Show loot items in Aimview widget"
+                                  IsChecked="{Binding AimviewShowLoot, Mode=TwoWay}"
+                                  Margin="0,0,16,8" />
+                        <CheckBox Content="Show Quest Items"
+                                  ToolTip="Show quest items in Aimview widget"
+                                  IsChecked="{Binding AimviewShowQuestItems, Mode=TwoWay}"
+                                  Margin="0,0,16,8" />
+                        <CheckBox Content="Show AI"
+                                  ToolTip="Show AI/Scavs/Bosses in Aimview widget"
+                                  IsChecked="{Binding AimviewShowAI, Mode=TwoWay}"
+                                  Margin="0,0,16,8" />
+                        <CheckBox Content="Show Enemy Players"
+                                  ToolTip="Show enemy players in Aimview widget"
+                                  IsChecked="{Binding AimviewShowEnemyPlayers, Mode=TwoWay}"
+                                  Margin="0,0,16,8" />
+                        <CheckBox Content="Head Circle"
+                                  ToolTip="Draw head circles for players and AI in Aimview widget"
+                                  IsChecked="{Binding AimviewShowHeadCircle, Mode=TwoWay}"
+                                  Margin="0,0,16,8" />
+                        <CheckBox Content="Show Containers"
+                                  ToolTip="Show static containers in Aimview widget"
+                                  IsChecked="{Binding AimviewShowContainers, Mode=TwoWay}"
+                                  Margin="0,0,16,8" />
+                        <CheckBox Content="Show Exfils"
+                                  ToolTip="Show exfil points in Aimview widget (always unlimited distance)"
+                                  IsChecked="{Binding AimviewShowExfils, Mode=TwoWay}"
+                                  Margin="0,0,0,8" />
+                    </WrapPanel>
 
-                        <!-- 2) Your existing template -->
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <CheckBox Content="{Binding Name}"
-                                          IsChecked="{Binding IsEnabled, Mode=TwoWay}" />
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                </DockPanel>
+                    <!-- Show Wishlisted for Aimview -->
+                    <WrapPanel Margin="0,4,0,8">
+                        <CheckBox Content="Show Wishlisted"
+                                  ToolTip="Show wishlist items with special marker in Aimview (uses color from Loot Filters)"
+                                  IsChecked="{Binding AimviewShowWishlisted, Mode=TwoWay}"
+                                  Margin="0,0,0,0" />
+                    </WrapPanel>
+                    
+                    <StackPanel Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                Margin="0,0,0,8">
+                        <TextBlock Text="Loot Render Distance (0 = Unlimited)"
+                                   VerticalAlignment="Center"
+                                   ToolTip="Maximum distance (in meters) to render loot items in Aimview. 0 = unlimited." />
+                        <Slider x:Name="AimviewLootDistanceSlider"
+                                Width="200"
+                                Margin="8,0"
+                                Minimum="0"
+                                Maximum="150"
+                                SmallChange="1"
+                                LargeChange="10"
+                                Value="{Binding AimviewLootRenderDistance, Mode=TwoWay}" />
+                        <TextBlock Text="{Binding Value, ElementName=AimviewLootDistanceSlider, StringFormat='{}{0:F0}m'}"
+                                   VerticalAlignment="Center"
+                                   Margin="8,0,0,0"
+                                   MinWidth="50" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                Margin="0,0,0,8"
+                                IsEnabled="{Binding AimviewShowContainers}">
+                        <TextBlock Text="Container Distance (0 = Unlimited)"
+                                   VerticalAlignment="Center"
+                                   ToolTip="Maximum distance (in meters) to render containers in Aimview. 0 = unlimited." />
+                        <Slider x:Name="AimviewContainerDistanceSlider"
+                                Width="150"
+                                Margin="8,0"
+                                Minimum="0"
+                                Maximum="200"
+                                SmallChange="1"
+                                LargeChange="10"
+                                Value="{Binding AimviewContainerDistance, Mode=TwoWay}" />
+                        <TextBlock Text="{Binding Value, ElementName=AimviewContainerDistanceSlider, StringFormat='{}{0:F0}m'}"
+                                   VerticalAlignment="Center"
+                                   Margin="8,0,0,0"
+                                   MinWidth="50" />
+                    </StackPanel>
+                </StackPanel>
             </GroupBox>
 
         </StackPanel>

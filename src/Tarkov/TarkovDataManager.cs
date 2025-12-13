@@ -26,10 +26,10 @@ SOFTWARE.
  *
 */
 
-using LoneEftDmaRadar.Tarkov.GameWorld.Hazards;
 using LoneEftDmaRadar.Tarkov.GameWorld.Quests;
 using LoneEftDmaRadar.Web.TarkovDev.Data;
 using System.Collections.Frozen;
+using QuestObjectiveType = LoneEftDmaRadar.Tarkov.GameWorld.Quests.QuestObjectiveType;
 
 namespace LoneEftDmaRadar.Tarkov
 {
@@ -41,6 +41,11 @@ namespace LoneEftDmaRadar.Tarkov
         private static readonly FileInfo _bakDataFile = new(Path.Combine(App.ConfigPath.FullName, "data.json.bak"));
         private static readonly FileInfo _tempDataFile = new(Path.Combine(App.ConfigPath.FullName, "data.json.tmp"));
         private static readonly FileInfo _dataFile = new(Path.Combine(App.ConfigPath.FullName, "data.json"));
+        private static readonly JsonSerializerOptions _jsonOptions = new()
+        {
+            PropertyNameCaseInsensitive = true,
+            NumberHandling = JsonNumberHandling.AllowReadingFromString
+        };
 
         /// <summary>
         /// Master items dictionary - mapped via BSGID String.
@@ -56,14 +61,17 @@ namespace LoneEftDmaRadar.Tarkov
         /// Maps Data for Tarkov.
         /// </summary>
         public static FrozenDictionary<string, MapElement> MapData { get; private set; }
+
         /// <summary>
-        ///  Tasks Data for Tarkov.
+        /// Tasks Data for Tarkov.
         /// </summary>
         public static FrozenDictionary<string, TaskElement> TaskData { get; private set; }
+
         /// <summary>
         /// All Task Zones mapped by MapID -> ZoneID -> Position.
         /// </summary>
         public static FrozenDictionary<string, FrozenDictionary<string, Vector3>> TaskZones { get; private set; }
+
         /// <summary>
         /// XP Table for Tarkov.
         /// </summary>
@@ -90,12 +98,52 @@ namespace LoneEftDmaRadar.Tarkov
             }
         }
 
+        /// <summary>
+        /// Refresh data from API. If API fails, keeps existing cached data.
+        /// </summary>
+        public static async Task RefreshFromApiAsync()
+        {
+            try
+            {
+                string dataJson = await TarkovDevDataJob.GetUpdatedDataAsync();
+                if (string.IsNullOrEmpty(dataJson))
+                    throw new InvalidOperationException("API returned empty data");
+                
+                // Save to disk
+                await File.WriteAllTextAsync(_tempDataFile.FullName, dataJson);
+                if (_dataFile.Exists)
+                {
+                    File.Replace(
+                        sourceFileName: _tempDataFile.FullName,
+                        destinationFileName: _dataFile.FullName,
+                        destinationBackupFileName: _bakDataFile.FullName,
+                        ignoreMetadataErrors: true);
+                }
+                else
+                {
+                    File.Move(_tempDataFile.FullName, _dataFile.FullName, overwrite: true);
+                }
+                
+                // Parse and set data
+                var data = JsonSerializer.Deserialize<TarkovData>(dataJson, _jsonOptions);
+                if (data != null)
+                {
+                    SetData(data);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[TarkovDataManager] API refresh failed: {ex.Message}");
+                // Keep using cached data - don't throw
+            }
+        }
+
         #endregion
 
         #region Methods
 
         /// <summary>
-        /// Loads Game/FilteredLoot Data and sets the static dictionaries.
+        /// Loads Game/Loot Data and sets the static dictionaries.
         /// If updated data is needed, spawns a background task to retrieve it.
         /// </summary>
         /// <returns></returns>
@@ -123,52 +171,153 @@ namespace LoneEftDmaRadar.Tarkov
         /// <param name="data">Data to be set.</param>
         private static void SetData(TarkovData data)
         {
-            AllItems = data.Items.Where(x => !x.Tags?.Contains("Static Container") ?? false)
+            if (data == null)
+                return;
+            
+            // Items
+            AllItems = (data.Items ?? new List<TarkovMarketItem>())
+                .Where(x => x != null && (!x.Tags?.Contains("Static Container") ?? false))
                 .DistinctBy(x => x.BsgId, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(k => k.BsgId, v => v, StringComparer.OrdinalIgnoreCase)
                 .ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
-            AllContainers = data.Items.Where(x => x.Tags?.Contains("Static Container") ?? false)
+            
+            // Containers
+            AllContainers = (data.Items ?? new List<TarkovMarketItem>())
+                .Where(x => x != null && (x.Tags?.Contains("Static Container") ?? false))
                 .DistinctBy(x => x.BsgId, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(k => k.BsgId, v => v, StringComparer.OrdinalIgnoreCase)
                 .ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+            
+            // Tasks
             TaskData = (data.Tasks ?? new List<TaskElement>())
-                .Where(t => !string.IsNullOrWhiteSpace(t?.Id))
+                .Where(t => t != null && !string.IsNullOrWhiteSpace(t.Id))
                 .DistinctBy(t => t.Id, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(t => t.Id, t => t, StringComparer.OrdinalIgnoreCase)
                 .ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
-            TaskZones = TaskData.Values
-                .Where(task => task.Objectives is not null) // Ensure the Objectives are not null
-                .SelectMany(task => task.Objectives)   // Flatten the Objectives from each TaskElement
-                .Where(objective => objective.Zones is not null) // Ensure the Zones are not null
-                .SelectMany(objective => objective.Zones)    // Flatten the Zones from each Objective
-                .Where(zone => zone.Position is not null && zone.Map?.NameId is not null) // Ensure Position and Map are not null
-                .GroupBy(zone => zone.Map.NameId, zone => new
-                {
-                    id = zone.Id,
-                    pos = new Vector3(zone.Position.X, zone.Position.Y, zone.Position.Z)
-                }, StringComparer.OrdinalIgnoreCase)
-                .DistinctBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(
-                    group => group.Key, // Map Id
-                    group => group
-                    .DistinctBy(x => x.id, StringComparer.OrdinalIgnoreCase)
+            
+            // Task Zones - with extensive null checks
+            try
+            {
+                TaskZones = TaskData.Values
+                    .Where(task => task?.Objectives != null)
+                    .SelectMany(task => task.Objectives)
+                    .Where(objective => objective?.Zones != null)
+                    .SelectMany(objective => objective.Zones)
+                    .Where(zone => zone?.Position != null && zone.Map?.NameId != null)
+                    .GroupBy(zone => zone.Map.NameId, zone => new
+                    {
+                        id = zone.Id,
+                        pos = new Vector3(zone.Position.X, zone.Position.Y, zone.Position.Z)
+                    }, StringComparer.OrdinalIgnoreCase)
+                    .DistinctBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
                     .ToDictionary(
-                        zone => zone.id,
-                        zone => zone.pos,
+                        group => group.Key,
+                        group => group
+                            .Where(x => !string.IsNullOrEmpty(x.id))
+                            .DistinctBy(x => x.id, StringComparer.OrdinalIgnoreCase)
+                            .ToDictionary(
+                                zone => zone.id,
+                                zone => zone.pos,
+                                StringComparer.OrdinalIgnoreCase
+                            ).ToFrozenDictionary(StringComparer.OrdinalIgnoreCase),
                         StringComparer.OrdinalIgnoreCase
-                    ).ToFrozenDictionary(StringComparer.OrdinalIgnoreCase),
-                    StringComparer.OrdinalIgnoreCase
-                )
-                .ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+                    )
+                    .ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                TaskZones = new Dictionary<string, FrozenDictionary<string, Vector3>>()
+                    .ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+            }
+            
+            // XP Table
             XPTable = data.PlayerLevels?.ToDictionary(x => x.Exp, x => x.Level) ?? new Dictionary<int, int>();
-            var maps = data.Maps.ToDictionary(x => x.NameId, StringComparer.OrdinalIgnoreCase) ??
-                new Dictionary<string, MapElement>(StringComparer.OrdinalIgnoreCase);
-            maps.TryAdd("Terminal", new MapElement() // Preliminary terminal support
+            
+            // Maps
+            var maps = (data.Maps ?? new List<MapElement>())
+                .Where(m => m != null && !string.IsNullOrEmpty(m.NameId))
+                .ToDictionary(x => x.NameId, StringComparer.OrdinalIgnoreCase);
+            maps.TryAdd("Terminal", new MapElement()
             {
                 Name = "Terminal",
                 NameId = "Terminal"
             });
-            MapData = maps.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase) ?? new Dictionary<string, MapElement>().ToFrozenDictionary();
+            MapData = maps.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+            
+            // Initialize QuestDatabase for QuestManager compatibility
+            InitializeQuestDatabase();
+        }
+
+        /// <summary>
+        /// Initializes the QuestDatabase from TaskData for QuestManager compatibility.
+        /// </summary>
+        private static void InitializeQuestDatabase()
+        {
+            try
+            {
+                if (TaskData == null || TaskData.Count == 0)
+                    return;
+
+                // Convert TaskData to API format for QuestDatabase
+                var tasks = TaskData.Values.Select(t => new Web.TarkovDev.Data.TaskElement
+                {
+                    Id = t.Id,
+                    Name = t.Name,
+                    Trader = t.Trader != null ? new Web.TarkovDev.Data.TraderElement
+                    {
+                        Name = t.Trader.Name
+                    } : null,
+                    Map = t.Map != null ? new Web.TarkovDev.Data.MapReferenceElement
+                    {
+                        NameId = t.Map.NameId,
+                        Name = t.Map.Name
+                    } : null,
+                    Objectives = t.Objectives?.Select(o => new Web.TarkovDev.Data.TaskObjectiveElement
+                    {
+                        Id = o.Id,
+                        Type = o._type,
+                        Description = o.Description,
+                        Item = o.Item != null ? new Web.TarkovDev.Data.ItemReferenceElement
+                        {
+                            Id = o.Item.Id,
+                            Name = o.Item.Name,
+                            ShortName = o.Item.ShortName
+                        } : null,
+                        QuestItem = o.QuestItem != null ? new Web.TarkovDev.Data.QuestItemReferenceElement
+                        {
+                            Id = o.QuestItem.Id,
+                            Name = o.QuestItem.Name,
+                            ShortName = o.QuestItem.ShortName
+                        } : null,
+                        MarkerItem = o.MarkerItem != null ? new Web.TarkovDev.Data.ItemReferenceElement
+                        {
+                            Id = o.MarkerItem.Id,
+                            Name = o.MarkerItem.Name
+                        } : null,
+                        Zones = o.Zones?.Select(z => new Web.TarkovDev.Data.ZoneElement
+                        {
+                            Id = z.Id,
+                            Map = z.Map != null ? new Web.TarkovDev.Data.MapReferenceElement
+                            {
+                                NameId = z.Map.NameId,
+                                Name = z.Map.Name
+                            } : null,
+                            Position = z.Position != null ? new Web.TarkovDev.Data.PositionElement
+                            {
+                                X = z.Position.X,
+                                Y = z.Position.Y,
+                                Z = z.Position.Z
+                            } : null
+                        }).ToList()
+                    }).ToList()
+                }).ToList();
+
+                QuestDatabase.Initialize(tasks);
+            }
+            catch
+            {
+                // QuestDatabase initialization failure should not break the main data loading
+            }
         }
 
         /// <summary>
@@ -212,7 +361,7 @@ namespace LoneEftDmaRadar.Tarkov
                     if (!file.Exists)
                         return null;
                     using var dataStream = File.OpenRead(file.FullName);
-                    return await JsonSerializer.DeserializeAsync<TarkovData>(dataStream, App.JsonOptions) ??
+                    return await JsonSerializer.DeserializeAsync<TarkovData>(dataStream, _jsonOptions) ??
                         throw new InvalidOperationException($"Failed to deserialize {nameof(dataStream)}");
                 }
                 catch
@@ -223,7 +372,7 @@ namespace LoneEftDmaRadar.Tarkov
         }
 
         /// <summary>
-        /// Loads updated Game/FilteredLoot Data from the web and sets the static dictionaries.
+        /// Loads updated Game/Loot Data from the web and sets the static dictionaries.
         /// </summary>
         /// <returns></returns>
         /// <exception cref="InvalidOperationException"></exception>
@@ -253,7 +402,7 @@ namespace LoneEftDmaRadar.Tarkov
                         destFileName: _dataFile.FullName,
                         overwrite: true);
                 }
-                var data = JsonSerializer.Deserialize<TarkovData>(dataJson, App.JsonOptions) ??
+                var data = JsonSerializer.Deserialize<TarkovData>(dataJson, _jsonOptions) ??
                     throw new InvalidOperationException($"Failed to deserialize {nameof(dataJson)}");
                 SetData(data);
             }
@@ -288,6 +437,21 @@ namespace LoneEftDmaRadar.Tarkov
             public List<TaskElement> Tasks { get; set; } = new();
         }
 
+        public class PositionElement
+        {
+            [JsonPropertyName("x")]
+            public float X { get; set; }
+
+            [JsonPropertyName("y")]
+            public float Y { get; set; }
+
+            [JsonPropertyName("z")]
+            public float Z { get; set; }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public Vector3 AsVector3() => new(X, Y, Z);
+        }
+
         public partial class MapElement
         {
             [JsonPropertyName("name")]
@@ -303,7 +467,7 @@ namespace LoneEftDmaRadar.Tarkov
             public List<TransitElement> Transits { get; set; } = new();
 
             [JsonPropertyName("hazards")]
-            public List<GenericWorldHazard> Hazards { get; set; } = new();
+            public List<HazardElement> Hazards { get; set; } = new();
         }
 
         public partial class PlayerLevelElement
@@ -315,6 +479,15 @@ namespace LoneEftDmaRadar.Tarkov
             public int Level { get; set; }
         }
 
+        public partial class HazardElement
+        {
+            [JsonPropertyName("hazardType")]
+            public string HazardType { get; set; }
+
+            [JsonPropertyName("position")]
+            public PositionElement Position { get; set; }
+        }
+
         public partial class ExtractElement
         {
             [JsonPropertyName("name")]
@@ -324,7 +497,7 @@ namespace LoneEftDmaRadar.Tarkov
             public string Faction { get; set; }
 
             [JsonPropertyName("position")]
-            public Vector3 Position { get; set; }
+            public PositionElement Position { get; set; }
 
             [JsonIgnore]
             public bool IsPmc => Faction?.Equals("pmc", StringComparison.OrdinalIgnoreCase) ?? false;
@@ -338,9 +511,8 @@ namespace LoneEftDmaRadar.Tarkov
             public string Description { get; set; }
 
             [JsonPropertyName("position")]
-            public Vector3 Position { get; set; }
+            public PositionElement Position { get; set; }
         }
-
 
         public partial class TaskElement
         {
@@ -350,8 +522,35 @@ namespace LoneEftDmaRadar.Tarkov
             [JsonPropertyName("name")]
             public string Name { get; set; }
 
+            [JsonPropertyName("trader")]
+            public TaskTraderElement Trader { get; set; }
+
+            [JsonPropertyName("map")]
+            public ObjectiveElement.TaskMapElement Map { get; set; }
+
             [JsonPropertyName("objectives")]
             public List<ObjectiveElement> Objectives { get; set; }
+
+            [JsonPropertyName("neededKeys")]
+            public List<NeededKeyGroup> NeededKeys { get; set; }
+
+            public class TaskTraderElement
+            {
+                [JsonPropertyName("name")]
+                public string Name { get; set; }
+            }
+
+            /// <summary>
+            /// Represents a group of keys needed for a quest (on a specific map).
+            /// </summary>
+            public class NeededKeyGroup
+            {
+                [JsonPropertyName("keys")]
+                public List<ObjectiveElement.MarkerItemClass> Keys { get; set; }
+
+                [JsonPropertyName("map")]
+                public ObjectiveElement.TaskMapElement Map { get; set; }
+            }
 
             public partial class ObjectiveElement
             {
@@ -364,32 +563,29 @@ namespace LoneEftDmaRadar.Tarkov
 #pragma warning restore IDE1006 // Naming Styles
 
                 [JsonIgnore]
-                private static readonly FrozenDictionary<string, QuestObjectiveType> _objectiveTypes = 
-    new Dictionary<string, QuestObjectiveType>(StringComparer.OrdinalIgnoreCase)
-    {
-        ["visit"] = QuestObjectiveType.Visit,
-        ["mark"] = QuestObjectiveType.Mark,
-        ["giveItem"] = QuestObjectiveType.GiveItem,
-        ["shoot"] = QuestObjectiveType.Shoot,
-        ["extract"] = QuestObjectiveType.Extract,
-        ["findQuestItem"] = QuestObjectiveType.FindQuestItem,
-        ["giveQuestItem"] = QuestObjectiveType.GiveQuestItem,
-        ["findItem"] = QuestObjectiveType.FindItem,
-        ["buildWeapon"] = QuestObjectiveType.BuildWeapon,
-        ["plantItem"] = QuestObjectiveType.PlantItem,
-        ["plantQuestItem"] = QuestObjectiveType.PlantQuestItem,
-        ["traderLevel"] = QuestObjectiveType.TraderLevel,
-        ["traderStanding"] = QuestObjectiveType.TraderStanding,
-        ["skill"] = QuestObjectiveType.Skill,
-        ["experience"] = QuestObjectiveType.Experience,
-        ["useItem"] = QuestObjectiveType.UseItem,
-        ["sellItem"] = QuestObjectiveType.SellItem,
-        ["taskStatus"] = QuestObjectiveType.TaskStatus,
-    }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
-
-                [JsonIgnore]
-                public QuestObjectiveType Type => 
-                    _objectiveTypes.TryGetValue(_type, out var type) ? type : QuestObjectiveType.Unknown;
+                public LoneEftDmaRadar.Tarkov.GameWorld.Quests.QuestObjectiveType Type =>
+                    _type switch
+                    {
+                        "visit" => LoneEftDmaRadar.Tarkov.GameWorld.Quests.QuestObjectiveType.Visit,
+                        "mark" => LoneEftDmaRadar.Tarkov.GameWorld.Quests.QuestObjectiveType.Mark,
+                        "giveItem" => LoneEftDmaRadar.Tarkov.GameWorld.Quests.QuestObjectiveType.GiveItem,
+                        "shoot" => LoneEftDmaRadar.Tarkov.GameWorld.Quests.QuestObjectiveType.Shoot,
+                        "extract" => LoneEftDmaRadar.Tarkov.GameWorld.Quests.QuestObjectiveType.Extract,
+                        "findQuestItem" => LoneEftDmaRadar.Tarkov.GameWorld.Quests.QuestObjectiveType.FindQuestItem,
+                        "giveQuestItem" => LoneEftDmaRadar.Tarkov.GameWorld.Quests.QuestObjectiveType.GiveQuestItem,
+                        "findItem" => LoneEftDmaRadar.Tarkov.GameWorld.Quests.QuestObjectiveType.FindItem,
+                        "buildWeapon" => LoneEftDmaRadar.Tarkov.GameWorld.Quests.QuestObjectiveType.BuildWeapon,
+                        "plantItem" => LoneEftDmaRadar.Tarkov.GameWorld.Quests.QuestObjectiveType.PlantItem,
+                        "plantQuestItem" => LoneEftDmaRadar.Tarkov.GameWorld.Quests.QuestObjectiveType.PlantQuestItem,
+                        "traderLevel" => LoneEftDmaRadar.Tarkov.GameWorld.Quests.QuestObjectiveType.TraderLevel,
+                        "traderStanding" => LoneEftDmaRadar.Tarkov.GameWorld.Quests.QuestObjectiveType.TraderStanding,
+                        "skill" => LoneEftDmaRadar.Tarkov.GameWorld.Quests.QuestObjectiveType.Skill,
+                        "experience" => LoneEftDmaRadar.Tarkov.GameWorld.Quests.QuestObjectiveType.Experience,
+                        "useItem" => LoneEftDmaRadar.Tarkov.GameWorld.Quests.QuestObjectiveType.UseItem,
+                        "sellItem" => LoneEftDmaRadar.Tarkov.GameWorld.Quests.QuestObjectiveType.SellItem,
+                        "taskStatus" => LoneEftDmaRadar.Tarkov.GameWorld.Quests.QuestObjectiveType.TaskStatus,
+                        _ => LoneEftDmaRadar.Tarkov.GameWorld.Quests.QuestObjectiveType.Unknown
+                    };
 
                 [JsonPropertyName("description")]
                 public string Description { get; set; }
@@ -421,37 +617,37 @@ namespace LoneEftDmaRadar.Tarkov
                 public class MarkerItemClass
                 {
                     [JsonPropertyName("id")]
-                    public string Id { get; set; }
+                    public String Id { get; set; }
 
                     [JsonPropertyName("name")]
-                    public string Name { get; set; }
+                    public String Name { get; set; }
 
                     [JsonPropertyName("shortName")]
-                    public string ShortName { get; set; }
+                    public String ShortName { get; set; }
                 }
 
                 public class ObjectiveQuestItem
                 {
                     [JsonPropertyName("id")]
-                    public string Id { get; set; }
+                    public String Id { get; set; }
 
                     [JsonPropertyName("name")]
-                    public string Name { get; set; }
+                    public String Name { get; set; }
 
                     [JsonPropertyName("shortName")]
-                    public string ShortName { get; set; }
+                    public String ShortName { get; set; }
 
                     [JsonPropertyName("normalizedName")]
-                    public string NormalizedName { get; set; }
+                    public String NormalizedName { get; set; }
 
                     [JsonPropertyName("description")]
-                    public string Description { get; set; }
+                    public String Description { get; set; }
                 }
 
                 public class TaskZoneElement
                 {
                     [JsonPropertyName("id")]
-                    public string Id { get; set; }
+                    public String Id { get; set; }
 
                     [JsonPropertyName("position")]
                     public PositionElement Position { get; set; }
@@ -471,21 +667,8 @@ namespace LoneEftDmaRadar.Tarkov
                     [JsonPropertyName("name")]
                     public string Name { get; set; }
                 }
-
-                public class PositionElement
-                {
-                    [JsonPropertyName("y")]
-                    public float Y { get; set; }
-
-                    [JsonPropertyName("x")]
-                    public float X { get; set; }
-
-                    [JsonPropertyName("z")]
-                    public float Z { get; set; }
-                }
             }
         }
-
 
         #endregion
     }

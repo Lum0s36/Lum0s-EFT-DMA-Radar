@@ -51,6 +51,7 @@ namespace LoneEftDmaRadar.UI.Skia
         private float _relativeX;
         private float _relativeY;
         private bool _disposed;
+        private bool _isFocused;
 
         protected virtual float TitlePadding => 2.5f * ScaleFactor;
         protected virtual float BaseFontSize => 9f;
@@ -67,6 +68,11 @@ namespace LoneEftDmaRadar.UI.Skia
         protected SKPath ResizeTriangle => _resizeTriangle;
 
         public bool Minimized { get; protected set; }
+        public bool IsFocused 
+        { 
+            get => _isFocused;
+            protected set => _isFocused = value;
+        }
 
         public SKRect ClientRectangle => new(
             Rectangle.Left,
@@ -172,6 +178,7 @@ namespace LoneEftDmaRadar.UI.Skia
             parent.MouseMove += Parent_MouseMove;
             parent.MouseDown += Parent_MouseDown;
             parent.MouseUp += Parent_MouseUp;
+            parent.MouseWheel += Parent_MouseWheel;
             parent.SizeChanged += Parent_SizeChanged;
         }
 
@@ -181,17 +188,44 @@ namespace LoneEftDmaRadar.UI.Skia
             parent.MouseDown -= Parent_MouseDown;
             parent.MouseUp -= Parent_MouseUp;
             parent.MouseMove -= Parent_MouseMove;
+            parent.MouseWheel -= Parent_MouseWheel;
             parent.SizeChanged -= Parent_SizeChanged;
+        }
+
+        // Convert WPF DIPs to SKGL canvas pixels to handle DPI scaling correctly
+        private SKPoint ToCanvasPoint(System.Windows.IInputElement element, System.Windows.Point pos)
+        {
+            double aw = _parent.ActualWidth;
+            double ah = _parent.ActualHeight;
+            var cs = _parent.CanvasSize;
+            if (aw <= 0 || ah <= 0 || cs.Width <= 0 || cs.Height <= 0)
+                return new SKPoint((float)pos.X, (float)pos.Y); // fallback
+            float x = (float)(pos.X * (cs.Width / aw));
+            float y = (float)(pos.Y * (cs.Height / ah));
+            return new SKPoint(x, y);
         }
 
         private void Parent_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             var element = (IInputElement)sender;
             var pos = e.GetPosition(element);
-            _lastMousePosition = new((float)pos.X, (float)pos.Y);
+            var posF = ToCanvasPoint(element, pos);
+            _lastMousePosition = new(posF.X, posF.Y);
 
             var pt = new SKPoint(_lastMousePosition.X, _lastMousePosition.Y);
-            switch (HitTest(pt))
+            var hitResult = HitTest(pt);
+            
+            // Set focus if clicked inside widget
+            if (hitResult != SKWidgetClickEvent.None)
+            {
+                IsFocused = true;
+            }
+            else
+            {
+                IsFocused = false;
+            }
+
+            switch (hitResult)
             {
                 case SKWidgetClickEvent.ClickedMinimize:
                     ToggleMinimized();
@@ -202,20 +236,61 @@ namespace LoneEftDmaRadar.UI.Skia
                 case SKWidgetClickEvent.ClickedResize:
                     _resizeDrag = true;
                     break;
+                case SKWidgetClickEvent.ClickedClientArea:
+                    // Call virtual method for derived classes
+                    OnClientAreaClicked(pt);
+                    break;
             }
+        }
+
+        /// <summary>
+        /// Override this in derived classes to handle clicks on client area.
+        /// </summary>
+        protected virtual void OnClientAreaClicked(SKPoint clickPoint)
+        {
+            // Base implementation does nothing
         }
 
         private void Parent_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e) => CancelInteractions();
         private void Parent_MouseUp(object sender, System.Windows.Input.MouseButtonEventArgs e) => CancelInteractions();
 
-        private readonly RateLimiter _mouseMoveRL = new(TimeSpan.FromSeconds(1d / 60));
-        private void Parent_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+        private void Parent_MouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
         {
-            if (!_mouseMoveRL.TryEnter())
+            // Only handle mouse wheel if widget is focused
+            if (!IsFocused || Minimized)
                 return;
+
             var element = (IInputElement)sender;
             var pos = e.GetPosition(element);
-            var posF = new SKPoint((float)pos.X, (float)pos.Y);
+            var posF = ToCanvasPoint(element, pos);
+            var pt = new SKPoint(posF.X, posF.Y);
+
+            // Check if mouse is still over widget
+            if (!Rectangle.Contains(pt.X, pt.Y))
+            {
+                IsFocused = false;
+                return;
+            }
+
+            // Call virtual method for derived classes to handle scrolling
+            OnMouseWheel(e.Delta);
+            e.Handled = true; // Prevent event bubbling to radar zoom
+        }
+
+        /// <summary>
+        /// Override this in derived classes to handle mouse wheel scrolling.
+        /// Delta is positive for scroll up, negative for scroll down.
+        /// </summary>
+        protected virtual void OnMouseWheel(int delta)
+        {
+            // Base implementation does nothing
+        }
+
+        private void Parent_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            var element = (IInputElement)sender;
+            var pos = e.GetPosition(element);
+            var posF = ToCanvasPoint(element, pos);
 
             if (_resizeDrag && CanResize)
             {

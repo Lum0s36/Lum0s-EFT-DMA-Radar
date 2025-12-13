@@ -44,11 +44,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player
         /// <summary>
         /// Player name.
         /// </summary>
-        public override string Name
-        {
-            get => "AI";
-            set { }
-        }
+        public override string Name { get; set; }
         /// <summary>
         /// Account UUID for Human Controlled Players.
         /// </summary>
@@ -93,7 +89,129 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player
             /// Setup Transform
             var ti = Memory.ReadPtrChain(this, false, _transformInternalChain);
             SkeletonRoot = new UnityTransform(ti);
-            _ = SkeletonRoot.UpdatePosition();
+            var initialPos = SkeletonRoot.UpdatePosition();
+            SetupBones();
+            // Initialize cached position for fallback (in case skeleton updates fail later)
+            _cachedPosition = initialPos;
+        }
+
+        public int GetPoseLevel()
+        {
+             return Memory.ReadValue<int>(MovementContext + 0xD0); // 0xD0 = PoseLevel in MovementContext
+        }
+
+        public float GetFov()
+        {
+            try
+            {
+                var hands = Memory.ReadPtr(Base + Offsets.Player._handsController);
+                if (hands == 0) return 0f;
+                
+                var anim = Memory.ReadPtr(hands + Offsets.FirearmController.WeaponAnimation);
+                if (anim == 0) return 0f;
+
+                return Memory.ReadValue<float>(anim + Offsets.ProceduralWeaponAnimation._fieldOfView);
+            }
+            catch { return 0f; }
+        }
+
+        public ulong PWA
+        {
+            get
+            {
+                try
+                {
+                    return Memory.ReadPtr(Base + Offsets.Player.ProceduralWeaponAnimation);
+                }
+                catch
+                {
+                    return 0;
+                }
+            }
+        }
+
+        public bool IsAiming
+        {
+            get
+            {
+                try
+                {
+                    var weaponAnim = PWA;
+                    if (weaponAnim == 0)
+                    {
+                        return false;
+                    }
+
+                    bool isAiming = Memory.ReadValue<bool>(weaponAnim + Offsets.ProceduralWeaponAnimation.IsAiming);
+                    return isAiming;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+        }
+
+        public int GetCurrentOpticZoom()
+        {
+            try
+            {
+                // This is a placeholder for getting the current optic zoom
+                // You would need to find the actual offset for the current optic zoom level
+                // For now, we can return a default value or try to find the offset
+                return 1;
+            }
+            catch { return 1; }
+        }
+
+        private void SetupBones()
+        {
+            var bonesToRegister = new[]
+            {
+                Bones.HumanHead,
+                Bones.HumanNeck,
+                Bones.HumanSpine3,
+                Bones.HumanSpine2,
+                Bones.HumanSpine1,
+                Bones.HumanPelvis,
+                Bones.HumanLUpperarm,
+                Bones.HumanLForearm1,
+                Bones.HumanLForearm2,
+                Bones.HumanLPalm,
+                Bones.HumanRUpperarm,
+                Bones.HumanRForearm1,
+                Bones.HumanRForearm2,
+                Bones.HumanRPalm,
+                Bones.HumanLThigh1,
+                Bones.HumanLThigh2,
+                Bones.HumanLCalf,
+                Bones.HumanLFoot,
+                Bones.HumanRThigh1,
+                Bones.HumanRThigh2,
+                Bones.HumanRCalf,
+                Bones.HumanRFoot
+            };
+
+            foreach (var bone in bonesToRegister)
+            {
+                try
+                {
+                    var chain = _transformInternalChain.ToArray();
+                    chain[chain.Length - 2] = UnityList<byte>.ArrStartOffset + (uint)bone * 0x8;
+                    
+                    var ti = Memory.ReadPtrChain(this, false, chain);
+                    var transform = new UnityTransform(ti);
+                    PlayerBones.TryAdd(bone, transform);
+                }
+                catch { }
+            }
+            
+            if (PlayerBones.Count > 0)
+            {
+                 _verticesCount = PlayerBones.Values.Max(x => x.Count);
+                 _verticesCount = Math.Max(_verticesCount, SkeletonRoot.Count);
+            }
+            Skeleton = new PlayerSkeleton(SkeletonRoot, PlayerBones);
         }
 
         /// <summary>
@@ -104,7 +222,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player
             try
             {
                 var groupIdPtr = Memory.ReadPtr(Info + Offsets.PlayerInfo.GroupId);
-                string groupId = Memory.ReadUnityString(groupIdPtr);
+                string groupId = Memory.ReadUnicodeString(groupIdPtr);
                 return _groups.GetOrAdd(
                     groupId,
                     _ => Interlocked.Increment(ref _lastGroupNumber));
@@ -118,7 +236,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player
         private ulong GetMovementContext()
         {
             var movementContext = Memory.ReadPtr(this + Offsets.Player.MovementContext);
-            var player = Memory.ReadPtr(movementContext + Offsets.MovementContext._player, false);
+            var player = Memory.ReadPtr(movementContext + Offsets.MovementContext.Player, false);
             if (player != this)
                 throw new ArgumentOutOfRangeException(nameof(movementContext));
             return movementContext;

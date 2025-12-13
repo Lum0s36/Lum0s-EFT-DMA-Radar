@@ -26,6 +26,8 @@ SOFTWARE.
  *
 */
 
+using System.ComponentModel;
+
 namespace LoneEftDmaRadar.UI.Misc
 {
     public class LoadingViewModel : INotifyPropertyChanged
@@ -71,6 +73,40 @@ namespace LoneEftDmaRadar.UI.Misc
             }
         }
 
+        private string _progressText = "0%";
+        /// <summary>
+        /// Progress percentage text (e.g., "45%")
+        /// </summary>
+        public string ProgressText
+        {
+            get => _progressText;
+            set
+            {
+                if (_progressText != value)
+                {
+                    _progressText = value;
+                    OnPropertyChanged(nameof(ProgressText));
+                }
+            }
+        }
+
+        private string _currentStep = "";
+        /// <summary>
+        /// Current loading step description
+        /// </summary>
+        public string CurrentStep
+        {
+            get => _currentStep;
+            set
+            {
+                if (_currentStep != value)
+                {
+                    _currentStep = value;
+                    OnPropertyChanged(nameof(CurrentStep));
+                }
+            }
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
         private void OnPropertyChanged(string propertyName) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
@@ -78,12 +114,14 @@ namespace LoneEftDmaRadar.UI.Misc
         /// <summary>
         /// Call to update both progress bar and status text.
         /// </summary>
-        public async Task UpdateProgressAsync(double percent, string status)
+        public async Task UpdateProgressAsync(double percent, string status, string step = "")
         {
             await _parent.Dispatcher.InvokeAsync(() =>
             {
                 Progress = percent;
                 StatusText = status;
+                ProgressText = $"{Math.Round(percent)}%";
+                CurrentStep = step;
             });
         }
     }

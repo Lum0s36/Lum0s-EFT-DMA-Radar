@@ -37,7 +37,13 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
     public sealed class StaticLootContainer : LootItem
     {
         private static readonly TarkovMarketItem _default = new();
-        public override string Name { get; } = "Container";
+        private readonly ulong _interactiveClass;
+
+        public override string Name { get; }
+
+        /// <summary>
+        /// Container's BSG ID.
+        /// </summary>
         public override string ID { get; }
 
         /// <summary>
@@ -45,20 +51,63 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
         /// </summary>
         public bool Searched { get; private set; }
 
-        public StaticLootContainer(string containerId, Vector3 position) : base(_default, position)
+        public StaticLootContainer(string containerId, Vector3 position)
+            : base(_default, position)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(containerId, nameof(containerId));
             ID = containerId;
-            if (TarkovDataManager.AllContainers.TryGetValue(containerId, out var container))
+            if (TarkovDataManager.AllContainers.TryGetValue(containerId, out var containerData))
             {
-                Name = container.ShortName ?? "Container";
+                Name = containerData.ShortName ?? "Container";
+            }
+            else
+            {
+                Name = "Container";
             }
         }
 
-        public override string GetUILabel() => this.Name;
+        // Internal constructor for LootManager with InteractiveClass
+        internal StaticLootContainer(string containerId, Vector3 position, ulong interactiveClass)
+            : this(containerId, position)
+        {
+            _interactiveClass = interactiveClass;
+        }
+
+        /// <summary>
+        /// Updates the searched status of this container by reading memory.
+        /// Called periodically by LootManager.
+        /// </summary>
+        internal void UpdateSearchedStatus()
+        {
+            if (_interactiveClass == 0)
+                return;
+
+            try
+            {
+                // Check if someone is currently interacting with the container (opened/searching)
+                // This mirrors the old implementation: InteractingPlayer != 0
+                var interactingPlayer = Memory.ReadValue<ulong>(_interactiveClass + Offsets.LootableContainer.InteractingPlayer);
+                if (interactingPlayer != 0)
+                {
+                    Searched = true;
+                }
+            }
+            catch
+            {
+                // Ignore errors during status update - container might have been removed
+            }
+        }
 
         public override void Draw(SKCanvas canvas, EftMapParams mapParams, LocalPlayer localPlayer)
         {
+            // ✅ Respect the master "Show Static Containers" checkbox
+            if (!App.Config.Containers.Enabled)
+                return;
+
+            // ✅ Hide searched containers if enabled
+            if (App.Config.Containers.HideSearched && Searched)
+                return;
+
             if (Position.WithinDistance(localPlayer.Position, App.Config.Containers.DrawDistance))
             {
                 var heightDiff = Position.Y - localPlayer.Position.Y;
@@ -88,7 +137,8 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
 
         public override void DrawMouseover(SKCanvas canvas, EftMapParams mapParams, LocalPlayer localPlayer)
         {
-            Position.ToMapPos(mapParams.Map).ToZoomedPos(mapParams).DrawMouseoverText(canvas, Name);
+            var text = Searched ? $"{Name} (Searched)" : Name;
+            Position.ToMapPos(mapParams.Map).ToZoomedPos(mapParams).DrawMouseoverText(canvas, text);
         }
     }
 }

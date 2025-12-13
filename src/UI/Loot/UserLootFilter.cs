@@ -26,6 +26,7 @@ SOFTWARE.
  *
 */
 
+using SkiaSharp;
 using System.Collections.ObjectModel;
 
 namespace LoneEftDmaRadar.UI.Loot

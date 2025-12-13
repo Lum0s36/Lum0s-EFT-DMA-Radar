@@ -26,6 +26,8 @@ SOFTWARE.
  *
 */
 
+using System.Windows.Media;
+
 namespace LoneEftDmaRadar.UI.Misc
 {
     public sealed partial class LoadingWindow : Window, IDisposable
@@ -36,7 +38,48 @@ namespace LoneEftDmaRadar.UI.Misc
         {
             InitializeComponent();
             DataContext = ViewModel = new LoadingViewModel(this);
+            
+            // Subscribe to progress changes for smooth animation
+            ViewModel.PropertyChanged += ViewModel_PropertyChanged;
+            
+            // Wait for window to load before accessing named elements
+            Loaded += LoadingWindow_Loaded;
+            
             this.Show();
+        }
+
+        private void LoadingWindow_Loaded(object sender, System.Windows.RoutedEventArgs e)
+        {
+            // Setup RenderTransform for pulse ellipse after window is loaded
+            var pulseEllipse = FindName("PulseEllipse") as System.Windows.Shapes.Ellipse;
+            if (pulseEllipse != null && pulseEllipse.RenderTransform == null)
+            {
+                pulseEllipse.RenderTransform = new ScaleTransform();
+                pulseEllipse.RenderTransformOrigin = new System.Windows.Point(0.5, 0.5);
+            }
+        }
+
+        private void ViewModel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(LoadingViewModel.Progress))
+            {
+                // Trigger smooth progress animation
+                Dispatcher.BeginInvoke(new System.Action(() =>
+                {
+                    var progressFill = FindName("ProgressFill") as System.Windows.Controls.Border;
+                    if (progressFill != null)
+                    {
+                        var storyboard = (System.Windows.Media.Animation.Storyboard)Resources["ProgressAnimation"];
+                        if (storyboard != null)
+                        {
+                            // Clone storyboard to avoid conflicts
+                            var clonedStoryboard = storyboard.Clone();
+                            System.Windows.Media.Animation.Storyboard.SetTarget(clonedStoryboard, progressFill);
+                            clonedStoryboard.Begin();
+                        }
+                    }
+                }), System.Windows.Threading.DispatcherPriority.Render);
+            }
         }
 
         private bool _disposed;
@@ -44,6 +87,11 @@ namespace LoneEftDmaRadar.UI.Misc
         {
             if (Interlocked.Exchange(ref _disposed, true) == false)
             {
+                if (ViewModel != null)
+                {
+                    ViewModel.PropertyChanged -= ViewModel_PropertyChanged;
+                }
+                Loaded -= LoadingWindow_Loaded;
                 this.Close();
             }
         }

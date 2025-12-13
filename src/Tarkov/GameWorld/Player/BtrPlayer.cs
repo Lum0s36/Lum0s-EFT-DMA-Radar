@@ -27,6 +27,7 @@ SOFTWARE.
 */
 
 using LoneEftDmaRadar.Tarkov.GameWorld.Player.Helpers;
+using LoneEftDmaRadar.Tarkov.Unity.Structures;
 using VmmSharpEx.Scatter;
 
 namespace LoneEftDmaRadar.Tarkov.GameWorld.Player
@@ -44,11 +45,13 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player
         {
             get => ref _position;
         }
+
         public override string Name
         {
             get => "BTR";
             set { }
         }
+
         public BtrPlayer(ulong btrView, ulong playerBase) : base(playerBase)
         {
             _btrView = btrView;
@@ -60,7 +63,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player
         /// Set the position of the BTR.
         /// Give this function it's own unique Index.
         /// </summary>
-        /// <param name="index">Scatter read index to read off of.</param>
+        /// <param name="scatter">Scatter read instance.</param>
         public override void OnRealtimeLoop(VmmScatter scatter)
         {
             scatter.PrepareReadValue<Vector3>(_posAddr);

@@ -118,6 +118,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
         /// <summary>
         /// Checks if there is an existing BTR player in the Players Dictionary, and if not, it is allocated and swapped.
         /// </summary>
+        /// <param name="btrView">BTR View Address.</param>
         /// <param name="btrPlayerBase">Player Base Addr for BTR Operator.</param>
         public void TryAllocateBTR(ulong btrView, ulong btrPlayerBase)
         {

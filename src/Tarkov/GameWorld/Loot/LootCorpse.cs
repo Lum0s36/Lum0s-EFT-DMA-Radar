@@ -1,7 +1,7 @@
-﻿/*
+/*
  * Lone EFT DMA Radar
  * Brought to you by Lone (Lone DMA)
- * 
+ *
 MIT License
 
 Copyright (c) 2025 Lone DMA
@@ -27,11 +27,12 @@ SOFTWARE.
 */
 
 using Collections.Pooled;
-using LoneEftDmaRadar.Misc;
 using LoneEftDmaRadar.Tarkov.GameWorld.Player;
 using LoneEftDmaRadar.UI.Radar.Maps;
+using LoneEftDmaRadar.UI.Radar.ViewModels;
 using LoneEftDmaRadar.UI.Skia;
 using LoneEftDmaRadar.Web.TarkovDev.Data;
+using LoneEftDmaRadar.Misc;
 
 namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
 {
@@ -42,11 +43,9 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
         /// <summary>
         /// Corpse container's associated player object (if any).
         /// </summary>
-        public AbstractPlayer Player { get; private set; }
-        /// <summary>
-        /// Name of the corpse.
-        /// </summary>
-        public override string Name => Player?.Name ?? "Body";
+        public AbstractPlayer Player { get; set; }
+
+        public override string Name => Player?.Name ?? "Corpse";
 
         /// <summary>
         /// Constructor.
@@ -63,10 +62,9 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
         public void Sync(IReadOnlyList<AbstractPlayer> deadPlayers)
         {
             Player ??= deadPlayers?.FirstOrDefault(x => x.Corpse == _corpse);
-            Player?.LootObject ??= this;
+            if (Player is not null && Player.LootObject is null)
+                Player.LootObject = this;
         }
-
-        public override string GetUILabel() => this.Name;
 
         public override void Draw(SKCanvas canvas, EftMapParams mapParams, LocalPlayer localPlayer)
         {
@@ -115,17 +113,14 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
             if (Player is AbstractPlayer player)
             {
                 var name = App.Config.UI.HideNames && player.IsHuman ? "<Hidden>" : player.Name;
-                lines.Add($"{player.Type.ToString()}:{name}");
-                string g = null;
-                if (player.GroupID != -1) g = $"G:{player.GroupID} ";
-                if (g is not null) lines.Add(g);
-                if (Player is ObservedPlayer obs) // show equipment info
+                lines.Add($"{player.Type}:{name}");
+                if (player.GroupID != -1)
+                    lines.Add($"G:{player.GroupID} ");
+                if (Player is ObservedPlayer obs)
                 {
                     lines.Add($"Value: {Utilities.FormatNumberKM(obs.Equipment.Value)}");
                     foreach (var item in obs.Equipment.Items.OrderBy(e => e.Key))
-                    {
                         lines.Add($"{item.Key.Substring(0, 5)}: {item.Value.ShortName}");
-                    }
                 }
             }
             else

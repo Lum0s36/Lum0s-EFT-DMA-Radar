@@ -31,7 +31,7 @@ using LoneEftDmaRadar.Tarkov;
 namespace LoneEftDmaRadar.UI.Loot
 {
     /// <summary>
-    /// JSON Wrapper for Important FilteredLoot, now with INotifyPropertyChanged.
+    /// JSON Wrapper for Important Loot, now with INotifyPropertyChanged.
     /// </summary>
     public sealed class LootFilterEntry : INotifyPropertyChanged
     {
@@ -65,7 +65,7 @@ namespace LoneEftDmaRadar.UI.Loot
 
         private LootFilterEntryType _type = LootFilterEntryType.ImportantLoot;
         /// <summary>
-        /// Entry Type (0 = Important FilteredLoot, 1 = Blacklisted FilteredLoot)
+        /// Entry Type (0 = Important Loot, 1 = Blacklisted Loot)
         /// </summary>
         [JsonPropertyName("type")]
         public LootFilterEntryType Type
@@ -106,29 +106,54 @@ namespace LoneEftDmaRadar.UI.Loot
             set { if (_comment != value) { _comment = value; OnPropertyChanged(); } }
         }
 
-        private string _color = null;
+        private string? _color = null;
         /// <summary>
-        /// Hex value of the rgba color. If not set, inherits from parent filter.
+        /// Hex value of the rgba color.
         /// </summary>
         [JsonPropertyName("color")]
         public string Color
         {
-            get => _color ??= ParentFilter?.Color ?? SKColors.Turquoise.ToString(); // Also sets _color if null
+            get
+            {
+                // If transparent or null, inherit from parent filter
+                if (string.IsNullOrEmpty(_color) || SKColor.TryParse(_color, out var parsed) && parsed.Alpha == 0)
+                    return ParentFilter?.Color ?? SKColors.Turquoise.ToString();
+                return _color;
+            }
             set
             {
                 if (_color != value)
                 {
                     _color = value;
                     OnPropertyChanged();
+                    OnPropertyChanged(nameof(ExplicitColor));
                 }
             }
         }
 
         /// <summary>
-        /// Reference to the parent filter (not serialized).
+        /// Reference to parent UserLootFilter (not serialized).
         /// </summary>
         [JsonIgnore]
-        public UserLootFilter ParentFilter { get; set; }
+        public UserLootFilter? ParentFilter { get; set; }
+
+        /// <summary>
+        /// For UI display: shows the explicit color or null if inheriting.
+        /// </summary>
+        [JsonIgnore]
+        public string? ExplicitColor
+        {
+            get => _color;
+            set
+            {
+                if (_color != value)
+                {
+                    _color = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(Color));
+                }
+            }
+        }
 
         public event PropertyChangedEventHandler PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string propName = null)

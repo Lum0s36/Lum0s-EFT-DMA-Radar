@@ -26,6 +26,8 @@ SOFTWARE.
  *
 */
 
+using LoneEftDmaRadar.DMA;
+using LoneEftDmaRadar.UI.Misc;
 using System.Runtime;
 
 namespace LoneEftDmaRadar.Misc
@@ -36,8 +38,8 @@ namespace LoneEftDmaRadar.Misc
 
         static ResourceJanitor()
         {
-            Memory.RaidStarted += MemDMA_RaidStarted;
-            Memory.RaidStopped += MemDMA_RaidStopped;
+            MemDMA.RaidStarted += MemDMA_RaidStarted;
+            MemDMA.RaidStopped += MemDMA_RaidStopped;
             _ = Task.Run(WorkerRoutineAsync);
         }
 
@@ -60,7 +62,7 @@ namespace LoneEftDmaRadar.Misc
                     var info = new MEMORYSTATUSEX();
                     if (GlobalMemoryStatusEx(ref info) && info.dwMemoryLoad >= 92) // Over 92% memory usage
                     {
-                        Debug.WriteLine("[ResourceJanitor] High Memory Load, running cleanup...");
+                        DebugLogger.LogDebug("[ResourceJanitor] High Memory Load, running cleanup...");
                         Run(false);
                     }
                 }
@@ -99,7 +101,7 @@ namespace LoneEftDmaRadar.Misc
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"ResourceJanitor ERROR: {ex}");
+                    DebugLogger.LogDebug($"ResourceJanitor ERROR: {ex}");
                 }
             }
         }

@@ -1,4 +1,5 @@
 ﻿using LoneEftDmaRadar.Tarkov.Unity.Collections;
+using LoneEftDmaRadar.UI.Misc;
 using LoneEftDmaRadar.Web.TarkovDev.Data;
 using System.Collections.Frozen;
 
@@ -14,7 +15,6 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player.Helpers
         private readonly ConcurrentDictionary<string, TarkovMarketItem> _items = new(StringComparer.OrdinalIgnoreCase);
         private readonly ObservedPlayer _player;
         private bool _inited;
-        private int _cachedValue;
 
         /// <summary>
         /// Player's eqiuipped gear by slot.
@@ -23,7 +23,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player.Helpers
         /// <summary>
         /// Player's total equipment flea price value.
         /// </summary>
-        public int Value => _cachedValue;
+        public int Value => (int)_items.Values.Sum(i => i.FleaPrice);
 
         public PlayerEquipment(ObservedPlayer player)
         {
@@ -47,7 +47,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player.Helpers
                     foreach (var slotPtr in slotsArray)
                     {
                         var namePtr = Memory.ReadPtr(slotPtr + Offsets.Slot.ID);
-                        var name = Memory.ReadUnityString(namePtr);
+                        var name = Memory.ReadUnicodeString(namePtr);
                         if (_skipSlots.Contains(name))
                             continue;
                         _slots.TryAdd(name, slotPtr);
@@ -59,7 +59,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player.Helpers
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"Error initializing Player Equipment for '{_player.Name}': {ex}");
+                    DebugLogger.LogDebug($"Error initializing Player Equipment for '{_player.Name}': {ex}");
                 }
                 finally
                 {
@@ -72,14 +72,14 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player.Helpers
         {
             if (checkInit && !_inited)
                 return;
-            long totalValue = 0;
             foreach (var slot in _slots)
             {
                 try
                 {
                     if (_player.IsPmc && slot.Key == "Scabbard")
-                        continue;
-
+                    {
+                        continue; // skip pmc scabbard
+                    }
                     var containedItem = Memory.ReadPtr(slot.Value + Offsets.Slot.ContainedItem);
                     var inventorytemplate = Memory.ReadPtr(containedItem + Offsets.LootItem.Template);
                     var mongoId = Memory.ReadValue<MongoID>(inventorytemplate + Offsets.ItemTemplate._id);
@@ -87,7 +87,6 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player.Helpers
                     if (TarkovDataManager.AllItems.TryGetValue(id, out var item))
                     {
                         _items[slot.Key] = item;
-                        totalValue += item.FleaPrice;
                     }
                     else
                     {
@@ -99,7 +98,6 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player.Helpers
                     _items.TryRemove(slot.Key, out _);
                 }
             }
-            _cachedValue = (int)totalValue;
         }
 
     }

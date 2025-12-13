@@ -1,71 +1,121 @@
-﻿<Window x:Class="LoneEftDmaRadar.UI.Hotkeys.HotkeyManagerWindow"
+<Window x:Class="LoneEftDmaRadar.UI.Hotkeys.HotkeyManagerWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:LoneEftDmaRadar.UI.Hotkeys"
-        xmlns:vm="clr-namespace:LoneEftDmaRadar.UI.Hotkeys"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="Hotkey Manager"
-        Width="800" Height="450"
-        MinWidth="600" MinHeight="300"
-        Icon="/lone-icon.ico">
-    <d:UserControl.DataContext>
-        <d:DesignInstance Type="{x:Type vm:HotkeyManagerViewModel}"
+        WindowStartupLocation="CenterOwner"
+        Width="520" Height="520"
+        MinWidth="480" MinHeight="400"
+        PreviewKeyDown="OnPreviewKeyDown"
+        Icon="/lone-icon.ico"
+        Focusable="True">
+    <Window.Resources>
+        <local:BooleanToBrushConverter x:Key="BooleanToBrushConverter" />
+    </Window.Resources>
+    <d:Window.DataContext>
+        <d:DesignInstance Type="{x:Type local:HotkeyManagerViewModel}"
                       IsDesignTimeCreatable="False"/>
-    </d:UserControl.DataContext>
-    <Grid Margin="10">
-        <GroupBox Header="Set Hotkeys In‑Game" FontWeight="Bold">
-            <DockPanel LastChildFill="True" Margin="8">
+    </d:Window.DataContext>
+    <Grid Margin="10" Background="#0f0f0f">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
 
-                <!-- Top row: Action + Key pickers and Add/Remove -->
-                <StackPanel DockPanel.Dock="Top"
+        <TextBlock Grid.Row="0"
+                   TextWrapping="Wrap"
+                   Foreground="#999"
+                   Margin="0,0,0,12"
+                   Text="Click an action/key to rebind (supports mouse/controller buttons). Press Escape while listening to cancel. Use Clear to unbind." />
+
+        <DataGrid Grid.Row="1"
+                  ItemsSource="{Binding Bindings}"
+                  HeadersVisibility="Column"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  CanUserResizeRows="False"
+                  Background="#141414"
+                  Foreground="#e5e5e5"
+                  BorderBrush="#333"
+                  BorderThickness="1"
+                  RowBackground="#141414"
+                  AlternatingRowBackground="#161616"
+                  GridLinesVisibility="None"
+                  MouseLeftButtonUp="OnBindingClick"
+                  SelectionMode="Single"
+                  SelectionUnit="FullRow">
+            <DataGrid.Resources>
+                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#303030"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#ffffff"/>
+                <Style TargetType="DataGridColumnHeader">
+                    <Setter Property="Background" Value="#1b1b1b"/>
+                    <Setter Property="Foreground" Value="#e5e5e5"/>
+                    <Setter Property="BorderBrush" Value="#333"/>
+                </Style>
+                <Style TargetType="DataGridRow">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="BorderBrush" Value="#222"/>
+                    <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsListening}" Value="True">
+                            <Setter Property="Background" Value="#2a2a2a"/>
+                        </DataTrigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Background" Value="#222"/>
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Background" Value="#303030"/>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+                <Style TargetType="DataGridCell">
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="BorderBrush" Value="Transparent"/>
+                    <Setter Property="BorderThickness" Value="0"/>
+                    <Style.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="Foreground" Value="#ffffff"/>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </DataGrid.Resources>
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Action" Binding="{Binding ActionName}" Width="2*"/>
+                <DataGridTemplateColumn Header="Key" Width="*">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Border Padding="6,3" Background="{Binding IsListening, Converter={StaticResource BooleanToBrushConverter}}">
+                                <TextBlock Text="{Binding DisplayKey}" />
+                            </Border>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="Reset" Width="90">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Content="Clear"
+                                    Padding="6,2"
+                                    HorizontalAlignment="Center"
+                                    Click="OnClearBindingClick" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <StackPanel Grid.Row="2"
                     Orientation="Horizontal"
-                    Margin="0,0,0,12">
-
-                    <!-- Action -->
-                    <StackPanel Width="200">
-                        <TextBlock Text="Action" Margin="0,0,0,4"/>
-                        <ComboBox ItemsSource="{Binding Controllers}" ScrollViewer.VerticalScrollBarVisibility="Auto"
-                      SelectedItem="{Binding SelectedAction}"
-                      HorizontalAlignment="Stretch"/>
-                    </StackPanel>
-
-                    <!-- Hotkey -->
-                    <StackPanel Width="200" Margin="16,0,0,0">
-                        <TextBlock Text="Hotkey" Margin="0,0,0,4"/>
-                        <ComboBox ItemsSource="{Binding AvailableKeys}" ScrollViewer.VerticalScrollBarVisibility="Auto"
-                      SelectedItem="{Binding SelectedKey}"
-                      HorizontalAlignment="Stretch"/>
-                    </StackPanel>
-
-                    <!-- Add / Remove -->
-                    <StackPanel Margin="16,0,0,0" VerticalAlignment="Bottom">
-                        <Button Content="Add"
-                    Command="{Binding AddCommand}"
-                    MinWidth="75"
-                    Margin="0,0,0,6"/>
-                        <Button Content="Remove"
-                    Command="{Binding RemoveCommand}"
-                    MinWidth="75"/>
-                    </StackPanel>
-                </StackPanel>
-
-                <!-- Bottom: Close button -->
-                <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
-                    <Button Content="Close"
-                  Command="{Binding CloseCommand}"
-                  Width="80"
-                  HorizontalAlignment="Center"/>
-                </DockPanel>
-
-                <!-- Center: Hotkey list -->
-                <ListBox ItemsSource="{Binding HotkeyEntries}" SelectedItem="{Binding SelectedEntry}"
-                 DisplayMemberPath="."
-                 BorderThickness="1"
-                 BorderBrush="Gray"
-                 Padding="4"/>
-            </DockPanel>
-        </GroupBox>
+                    HorizontalAlignment="Right"
+                    Margin="0,8,0,0">
+            <Button Content="Close"
+                    Width="90"
+                    Height="28"
+                    Click="Close_Click" />
+        </StackPanel>
     </Grid>
 </Window>

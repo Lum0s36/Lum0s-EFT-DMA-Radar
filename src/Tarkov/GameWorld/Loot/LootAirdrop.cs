@@ -1,7 +1,7 @@
-﻿/*
+/*
  * Lone EFT DMA Radar
  * Brought to you by Lone (Lone DMA)
- * 
+ *
 MIT License
 
 Copyright (c) 2025 Lone DMA
@@ -43,8 +43,6 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
         {
         }
 
-        public override string GetUILabel() => this.Name;
-
         public override void Draw(SKCanvas canvas, EftMapParams mapParams, LocalPlayer localPlayer)
         {
             var heightDiff = Position.Y - localPlayer.Position.Y;
@@ -69,20 +67,6 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
                 canvas.DrawCircle(point, size, SKPaints.ShapeOutline);
                 canvas.DrawCircle(point, size, SKPaints.PaintImportantLoot);
             }
-            point.Offset(7 * App.Config.UI.UIScale, 3 * App.Config.UI.UIScale);
-
-            canvas.DrawText(
-                this.Name,
-                point,
-                SKTextAlign.Left,
-                SKFonts.UIRegular,
-                SKPaints.TextOutline); // Draw outline
-            canvas.DrawText(
-                this.Name,
-                point,
-                SKTextAlign.Left,
-                SKFonts.UIRegular,
-                SKPaints.TextImportantLoot);
         }
 
 

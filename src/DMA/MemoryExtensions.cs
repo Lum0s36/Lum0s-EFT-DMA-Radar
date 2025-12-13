@@ -30,6 +30,129 @@ namespace LoneEftDmaRadar.DMA
 {
     internal static class MemoryExtensions
     {
-        // empty... for now
+        /// <summary>
+        /// Checks if an array contains a signature, and returns the offset where the signature occurs.
+        /// </summary>
+        /// <param name="array">Array to search in.</param>
+        /// <param name="signature">Signature to search for. Must not be larger than array.</param>
+        /// <param name="mask">Optional Signature Mask. x = check for match, ? = wildcard</param>
+        /// <returns>Signature offset within array. -1 if not found.</returns>
+        public static int FindSignatureOffset(this byte[] array, ReadOnlySpan<byte> signature, string mask = null)
+        {
+            ReadOnlySpan<byte> span = array.AsSpan();
+            return span.FindSignatureOffset(signature, mask);
+        }
+
+        /// <summary>
+        /// Checks if an array contains a signature, and returns the offset where the signature occurs.
+        /// </summary>
+        /// <param name="array">Array to search in.</param>
+        /// <param name="signature">Signature to search for. Must not be larger than array.</param>
+        /// <param name="mask">Optional Signature Mask. x = check for match, ? = wildcard</param>
+        /// <returns>Signature offset within array. -1 if not found.</returns>
+        public static int FindSignatureOffset(this Span<byte> array, ReadOnlySpan<byte> signature, string mask = null)
+        {
+            ReadOnlySpan<byte> span = array;
+            return span.FindSignatureOffset(signature, mask);
+        }
+
+        /// <summary>
+        /// Checks if an array contains a signature, and returns the offset where the signature occurs.
+        /// </summary>
+        /// <param name="array">Array to search in.</param>
+        /// <param name="signature">Signature to search for. Must not be larger than array.</param>
+        /// <param name="mask">Optional Signature Mask. x = check for match, ? = wildcard</param>
+        /// <returns>Signature offset within array. -1 if not found.</returns>
+        public static int FindSignatureOffset(this ReadOnlySpan<byte> array, ReadOnlySpan<byte> signature, string mask = null)
+        {
+            ArgumentOutOfRangeException.ThrowIfZero(array.Length, nameof(array));
+            ArgumentOutOfRangeException.ThrowIfZero(signature.Length, nameof(signature));
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(signature.Length, array.Length, nameof(signature));
+            if (mask is not null && signature.Length != mask.Length)
+                throw new ArgumentException("Mask Length does not match Signature length!");
+
+            for (int i = 0; i <= array.Length - signature.Length; i++)
+            {
+                bool found = true;
+                for (int j = 0; j < signature.Length; j++)
+                {
+                    if (mask is not null && mask[j] == '?') // Skip on wildcard mask
+                        continue;
+                    // If any byte does not match, set found to false and break the inner loop.
+                    if (array[i + j] != signature[j])
+                    {
+                        found = false;
+                        break;
+                    }
+                }
+
+                // If all bytes match, return the current index.
+                if (found)
+                {
+                    return i;
+                }
+            }
+
+            // If the signature is not found, return -1.
+            return -1;
+        }
+
+        /// <summary>
+        /// Calculates a new address by adding the instruction size and a relative virtual address (RVA) to the current address.
+        /// </summary>
+        /// <param name="address">Current virtual address.</param>
+        /// <param name="instructionSize">Assembly instruction length in bytes.</param>
+        /// <param name="rva">Relative virtual address (RVA).</param>
+        /// <returns>New address calculated from the RVA.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ulong AddRVA(this ulong address, uint instructionSize, int rva)
+        {
+            // signed rva can be negative, so we need to use long for the calculation
+            long result = (long)address + instructionSize + rva;
+            return (ulong)result;
+        }
+
+        /// <summary>
+        /// Calculates a new address by adding the instruction size and a relative virtual address (RVA) to the current address.
+        /// </summary>
+        /// <param name="address">Current virtual address.</param>
+        /// <param name="instructionSize">Assembly instruction length in bytes.</param>
+        /// <param name="rva">Relative virtual address (RVA).</param>
+        /// <returns>New address calculated from the RVA.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ulong AddRVA(this ulong address, uint instructionSize, uint rva)
+        {
+            return address + instructionSize + rva;
+        }
+
+        /// <summary>
+        /// Checks if a Virtual Address is valid.
+        /// </summary>
+        /// <param name="va">Virtual Address to validate.</param>
+        /// <returns>True if valid, otherwise False.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool IsValidVirtualAddress(this ulong va) =>
+            MemDMA.IsValidVirtualAddress(va);
+
+        /// <summary>
+        /// Throws an exception if the Virtual Address is invalid.
+        /// </summary>
+        /// <param name="va">Virtual address to validate.</param>
+        /// <param name="paramName">Parameter name to pass in exception message.</param>
+        /// <exception cref="InvalidOperationException"></exception>
+        public static void ThrowIfInvalidVirtualAddress(this ulong va, string paramName = null)
+        {
+            string errorMsg;
+            if (paramName is not null)
+            {
+                errorMsg = $"Invalid Virtual Address 0x{va:X} [{paramName}]";
+            }
+            else
+            {
+                errorMsg = $"Invalid Virtual Address 0x{va:X}";
+            }
+            if (!MemDMA.IsValidVirtualAddress(va))
+                throw new InvalidOperationException(errorMsg);
+        }
     }
 }

@@ -30,6 +30,8 @@ using LoneEftDmaRadar.UI.Radar.ViewModels;
 using LoneEftDmaRadar.UI.Skia;
 using System.Diagnostics.CodeAnalysis;
 using System.Windows.Input;
+using LoneEftDmaRadar.UI.ESP;
+using LoneEftDmaRadar.UI.Misc;
 
 namespace LoneEftDmaRadar
 {
@@ -38,17 +40,6 @@ namespace LoneEftDmaRadar
     /// </summary>
     public sealed partial class MainWindow : Window
     {
-        /// <summary>
-        /// Global Singleton instance of the MainWindow.
-        /// </summary>
-        [MaybeNull]
-        public static MainWindow Instance { get; private set; }
-
-        /// <summary>
-        /// ViewModel for the MainWindow.
-        /// </summary>
-        public MainWindowViewModel ViewModel { get; }
-
         public MainWindow()
         {
             if (Instance is not null)
@@ -63,6 +54,34 @@ namespace LoneEftDmaRadar
             DataContext = ViewModel = new MainWindowViewModel(this);
             Instance = this;
         }
+
+        private void BtnToggleESP_Click(object sender, RoutedEventArgs e)
+        {
+            ESPManager.ToggleESP();
+        }
+
+        private void MenuDebugLogger_Click(object sender, RoutedEventArgs e)
+        {
+            DebugLogger.Toggle();
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            ESPManager.CloseESP();
+            DebugLogger.Close();
+            base.OnClosed(e);
+        }
+
+        /// <summary>
+        /// Global Singleton instance of the MainWindow.
+        /// </summary>
+        [MaybeNull]
+        public static MainWindow Instance { get; private set; }
+
+        /// <summary>
+        /// ViewModel for the MainWindow.
+        /// </summary>
+        public MainWindowViewModel ViewModel { get; }
 
         /// <summary>
         /// Make sure the program really closes.
@@ -84,6 +103,13 @@ namespace LoneEftDmaRadar
                     App.Config.InfoWidget.Location = infoWidget.Rectangle;
                     App.Config.InfoWidget.Minimized = infoWidget.Minimized;
                 }
+                if (Radar?.ViewModel?.LootInfoWidget is LootInfoWidget lootInfoWidget)
+                {
+                    App.Config.LootInfoWidget.Location = lootInfoWidget.Rectangle;
+                    App.Config.LootInfoWidget.Minimized = lootInfoWidget.Minimized;
+                }
+
+                Memory.Dispose(); // Close FPGA
             }
             finally
             {
@@ -128,6 +154,20 @@ namespace LoneEftDmaRadar
             {
                 if (!Radar?.IsVisible ?? false)
                     return; // Ignore if radar is not visible
+
+                // Check if any widget is focused - if so, don't zoom radar
+                bool anyWidgetFocused = 
+                    (Radar?.ViewModel?.AimviewWidget?.IsFocused ?? false) ||
+                    (Radar?.ViewModel?.InfoWidget?.IsFocused ?? false) ||
+                    (Radar?.ViewModel?.LootInfoWidget?.IsFocused ?? false);
+
+                if (anyWidgetFocused)
+                {
+                    // Widget is handling the scroll - don't zoom radar
+                    return;
+                }
+
+                // No widget focused - perform radar zoom
                 if (e.Delta > 0) // mouse wheel up (zoom in)
                 {
                     int amt = (int)((e.Delta / wheelDelta) * 5d); // Calculate zoom amount based on number of deltas

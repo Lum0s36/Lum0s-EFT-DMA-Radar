@@ -27,6 +27,7 @@ SOFTWARE.
 */
 
 using LoneEftDmaRadar.Tarkov.Unity.Collections;
+using LoneEftDmaRadar.UI.Misc;
 
 namespace LoneEftDmaRadar.Tarkov.GameWorld.Explosives
 {
@@ -65,7 +66,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Explosives
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"Error Refreshing Explosive @ 0x{explosive.Addr.ToString("X")}: {ex}");
+                    DebugLogger.LogDebug($"Error Refreshing Explosive @ 0x{explosive.Addr.ToString("X")}: {ex}");
                 }
             }
             scatter.Execute();
@@ -89,13 +90,14 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Explosives
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"Error Processing Grenade @ 0x{grenade.ToString("X")}: {ex}");
+                        DebugLogger.LogDebug($"Error Processing Grenade @ 0x{grenade.ToString("X")}: {ex}");
+                        _ = _explosives.TryRemove(grenade, out _); // drop bad entry to avoid repeated errors
                     }
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Grenades Error: {ex}");
+                DebugLogger.LogDebug($"Grenades Error: {ex}");
             }
         }
 
@@ -119,13 +121,13 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Explosives
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"Error Processing SyncObject @ 0x{syncObject.ToString("X")}: {ex}");
+                        DebugLogger.LogDebug($"Error Processing SyncObject @ 0x{syncObject.ToString("X")}: {ex}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Sync Objects Error: {ex}");
+                DebugLogger.LogDebug($"Sync Objects Error: {ex}");
             }
         }
 

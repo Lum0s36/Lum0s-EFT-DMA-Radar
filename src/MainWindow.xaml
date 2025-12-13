@@ -1,4 +1,4 @@
-﻿<Window x:Class="LoneEftDmaRadar.MainWindow"
+<Window x:Class="LoneEftDmaRadar.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -6,8 +6,9 @@
         xmlns:local="clr-namespace:LoneEftDmaRadar"
         xmlns:vm="clr-namespace:LoneEftDmaRadar"
         xmlns:tabs="clr-namespace:LoneEftDmaRadar.UI.Radar.Views"
+        xmlns:hotkeys="clr-namespace:LoneEftDmaRadar.UI.Hotkeys"
         mc:Ignorable="d"
-        Title="Lone EFT DMA Radar"
+        Title="Moulman EFT DMA Radar"
         Width="1280" Height="720"
         Icon="/lone-icon.ico">
     <d:Window.DataContext>
@@ -15,13 +16,38 @@
                       IsDesignTimeCreatable="False"/>
     </d:Window.DataContext>
     <Grid>
-        <TabControl Margin="0">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="67*"/>
+            <ColumnDefinition Width="1213*"/>
+        </Grid.ColumnDefinitions>
+        <TabControl Grid.ColumnSpan="2">
             <TabItem Header="Radar"
                      x:Name="RadarTab">
                 <tabs:RadarTab x:Name="Radar" />
             </TabItem>
+
             <TabItem Header="Settings">
-                <tabs:SettingsTab x:Name="Settings" />
+                <TabControl Margin="4">
+                    <TabItem Header="Radar">
+                        <tabs:SettingsTab x:Name="Settings" />
+                    </TabItem>
+                    <TabItem Header="ESP Fuser">
+                        <tabs:EspSettingsTab x:Name="EspSettings" />
+                    </TabItem>
+                    <TabItem Header="Hotkeys">
+                        <hotkeys:HotkeyManagerTab x:Name="HotkeyManager" />
+                    </TabItem>
+                    <TabItem Header="Device Aimbot">
+                        <tabs:DeviceAimbotTab x:Name="DeviceAimbot" />
+                    </TabItem>
+                    <TabItem Header="MemWrites">
+                        <tabs:MemWritesTab x:Name="MemWrites" />
+                    </TabItem>
+                </TabControl>
+            </TabItem>
+
+            <TabItem Header="Quest Helper">
+                <tabs:QuestHelperTab x:Name="QuestHelper" />
             </TabItem>
             <TabItem Header="Web Radar">
                 <tabs:WebRadarTab x:Name="WebRadar" />
@@ -32,8 +58,8 @@
             <TabItem Header="Player Watchlist">
                 <tabs:PlayerWatchlistTab x:Name="PlayerWatchlist"/>
             </TabItem>
-            <TabItem Header="Loot Filters">
-                <tabs:LootFiltersTab x:Name="LootFilters"/>
+            <TabItem Header="Debug">
+                <tabs:DebugTab x:Name="DebugTab" />
             </TabItem>
         </TabControl>
     </Grid>

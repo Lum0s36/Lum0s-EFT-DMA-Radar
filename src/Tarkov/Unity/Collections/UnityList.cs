@@ -1,7 +1,7 @@
-﻿/*
+/*
  * Lone EFT DMA Radar
  * Brought to you by Lone (Lone DMA)
- * 
+ *
 MIT License
 
 Copyright (c) 2025 Lone DMA
@@ -27,6 +27,7 @@ SOFTWARE.
 */
 
 using Collections.Pooled;
+using LoneEftDmaRadar.DMA;
 
 namespace LoneEftDmaRadar.Tarkov.Unity.Collections
 {
@@ -53,7 +54,7 @@ namespace LoneEftDmaRadar.Tarkov.Unity.Collections
         /// <returns></returns>
         public static UnityList<T> Create(ulong addr, bool useCache = true)
         {
-            var count = LoneEftDmaRadar.DMA.Memory.ReadValue<int>(addr + CountOffset, useCache);
+            var count = MemoryInterface.Memory.ReadValue<int>(addr + CountOffset, useCache);
             ArgumentOutOfRangeException.ThrowIfGreaterThan(count, 16384, nameof(count));
             var list = new UnityList<T>(count);
             try
@@ -62,8 +63,8 @@ namespace LoneEftDmaRadar.Tarkov.Unity.Collections
                 {
                     return list;
                 }
-                var listBase = LoneEftDmaRadar.DMA.Memory.ReadPtr(addr + ArrOffset, useCache) + ArrStartOffset;
-                LoneEftDmaRadar.DMA.Memory.ReadSpan(listBase, list.Span, useCache);
+                var listBase = MemoryInterface.Memory.ReadPtr(addr + ArrOffset, useCache) + ArrStartOffset;
+                MemoryInterface.Memory.ReadSpan(listBase, list.Span, useCache);
                 return list;
             }
             catch

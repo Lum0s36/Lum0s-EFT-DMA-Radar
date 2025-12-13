@@ -57,7 +57,7 @@ namespace LoneEftDmaRadar.Web.TarkovDev.Data
             .AddStandardResilienceHandler(options =>
             {
                 // Add retry logic for 403 responses -> sometimes tarkov.dev returns 403 for no reason but works immediately on retry
-                options.Retry.ShouldHandle += args =>
+                options.Retry.ShouldHandle = args =>
                 {
                     if (args.Outcome.Result is HttpResponseMessage response)
                         return ValueTask.FromResult(response.StatusCode == HttpStatusCode.Forbidden);
@@ -89,18 +89,6 @@ namespace LoneEftDmaRadar.Web.TarkovDev.Data
                             description
                             position {x,y,z}
                         }
-                        hazards {
-                          hazardType
-                          position {
-                            x
-                            y
-                            z
-                          }
-                        }
-                    }
-                    playerLevels {
-                        exp
-                        level
                     }
                     items { 
                         id 
@@ -127,151 +115,6 @@ namespace LoneEftDmaRadar.Web.TarkovDev.Data
                         id 
                         normalizedName 
                         name 
-                    }
-                    tasks {
-                      id
-                      name
-                      objectives {
-                        id
-                        type
-                        description
-                        maps {
-                          nameId
-                          name
-                          normalizedName
-                        }
-                        ... on TaskObjectiveItem {
-                          item {
-                            id
-                            name
-                            shortName
-                          }
-                          zones {
-                            id
-                            map {
-                              nameId
-                              normalizedName
-                              name
-                            }
-                            position {
-                              y
-                              x
-                              z
-                            }
-                          }
-                          requiredKeys {
-                            id
-                            name
-                            shortName
-                          }
-                          count
-                          foundInRaid
-                        }
-                        ... on TaskObjectiveMark {
-                          id
-                          description
-                          markerItem {
-                            id
-                            name
-                            shortName
-                          }
-                          maps {
-                            nameId
-                            normalizedName
-                            name
-                          }
-                          zones {
-                            id
-                            map {
-                              nameId
-                              normalizedName
-                              name
-                            }
-                            position {
-                              y
-                              x
-                              z
-                            }
-                          }
-                          requiredKeys {
-                            id
-                            name
-                            shortName
-                          }
-                        }
-                        ... on TaskObjectiveQuestItem {
-                          id
-                          description
-                          requiredKeys {
-                            id
-                            name
-                            shortName
-                          }
-                          maps {
-                            nameId
-                            normalizedName
-                            name
-                          }
-                          zones {
-                            id
-                            map {
-                              id
-                              normalizedName
-                              name
-                            }
-                            position {
-                              y
-                              x
-                              z
-                            }
-                          }
-                          requiredKeys {
-                            id
-                            name
-                            shortName
-                          }
-                          questItem {
-                            id
-                            name
-                            shortName
-                            normalizedName
-                            description
-                          }
-                          count
-                        }
-                        ... on TaskObjectiveBasic {
-                          id
-                          description
-                          requiredKeys {
-                            id
-                            name
-                            shortName
-                          }
-                          maps {
-                            nameId
-                            normalizedName
-                            name
-                          }
-                          zones {
-                            id
-                            map {
-                              nameId
-                              normalizedName
-                              name
-                            }
-                            position {
-                              y
-                              x
-                              z
-                            }
-                          }
-                          requiredKeys {
-                            id
-                            name
-                            shortName
-                          }
-                        }
-                      }
                     }
                 }
                 """

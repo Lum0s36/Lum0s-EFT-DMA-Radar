@@ -120,7 +120,7 @@ namespace LoneEftDmaRadar.Web.TarkovDev.Data
     /// <summary>
     /// Class JSON Representation of Tarkov Market Data.
     /// </summary>
-    public sealed class TarkovMarketItem
+    public class TarkovMarketItem
     {
         /// <summary>
         /// Item ID.
@@ -185,7 +185,7 @@ namespace LoneEftDmaRadar.Web.TarkovDev.Data
         /// Is a backpack.
         /// </summary>
         [JsonIgnore]
-        public bool IsBackpack => Tags.Contains("Backpack");
+        public bool IsBackpack => Tags.Any(tag => tag.IndexOf("backpack", StringComparison.OrdinalIgnoreCase) >= 0);
         /// <summary>
         /// Is a Weapon Item.
         /// </summary>

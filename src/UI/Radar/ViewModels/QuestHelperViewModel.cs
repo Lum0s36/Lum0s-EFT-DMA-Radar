@@ -1,0 +1,760 @@
+/*
+ * Quest Helper ViewModel - Complete Rewrite
+ * Clean, simple implementation
+ */
+
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Windows.Media;
+using LoneEftDmaRadar.Tarkov;
+using LoneEftDmaRadar.Tarkov.GameWorld.Quests;
+
+namespace LoneEftDmaRadar.UI.Radar.ViewModels
+{
+    public sealed class QuestHelperViewModel : INotifyPropertyChanged
+    {
+        public event PropertyChangedEventHandler PropertyChanged;
+        private void OnPropertyChanged(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+        private string _currentMapId;
+        private bool _isInRaid;
+
+        public QuestHelperViewModel()
+        {
+            RefreshAll();
+        }
+
+        #region Config Properties
+
+        public bool Enabled
+        {
+            get => App.Config.QuestHelper.Enabled;
+            set { App.Config.QuestHelper.Enabled = value; OnPropertyChanged(nameof(Enabled)); }
+        }
+
+        public float ZoneDrawDistance
+        {
+            get => App.Config.QuestHelper.ZoneDrawDistance;
+            set { App.Config.QuestHelper.ZoneDrawDistance = value; OnPropertyChanged(nameof(ZoneDrawDistance)); }
+        }
+
+        #endregion
+
+        #region Filter Properties
+
+        private string _searchFilter = "";
+        public string SearchFilter
+        {
+            get => _searchFilter;
+            set { _searchFilter = value; OnPropertyChanged(nameof(SearchFilter)); ApplyFilter(); }
+        }
+
+        /// <summary>
+        /// When enabled, shows only active quests for the current map (requires being in raid).
+        /// When disabled, shows all quests.
+        /// </summary>
+        public bool ActiveOnly
+        {
+            get => App.Config.QuestHelper.ActiveOnly;
+            set 
+            { 
+                App.Config.QuestHelper.ActiveOnly = value; 
+                OnPropertyChanged(nameof(ActiveOnly));
+                OnPropertyChanged(nameof(ActiveOnlyStatusText));
+                ApplyFilter();
+            }
+        }
+
+        /// <summary>
+        /// Status text showing the current filter state
+        /// </summary>
+        public string ActiveOnlyStatusText
+        {
+            get
+            {
+                if (!ActiveOnly)
+                    return "";
+                if (!_isInRaid)
+                    return "Not in raid - showing all quests";
+                return $"Showing active quests for: {GetMapName(_currentMapId)}";
+            }
+        }
+
+        #endregion
+
+        #region Quest Data
+
+        /// <summary>All quests from database</summary>
+        public ObservableCollection<QuestTrackingEntry> AllQuests { get; } = new();
+
+        /// <summary>Filtered quests for display</summary>
+        public ObservableCollection<QuestTrackingEntry> FilteredQuests { get; } = new();
+
+        public int TrackedQuestCount => AllQuests.Count(q => q.IsTracked);
+        public int TotalQuestCount => AllQuests.Count;
+        public int VisibleQuestCount => FilteredQuests.Count;
+
+        private string _selectAllButtonText = "Select All";
+        public string SelectAllButtonText
+        {
+            get => _selectAllButtonText;
+            set { _selectAllButtonText = value; OnPropertyChanged(nameof(SelectAllButtonText)); }
+        }
+
+        #endregion
+
+        #region Info Display
+
+        private string _databaseInfo = "Loading...";
+        public string DatabaseInfo
+        {
+            get => _databaseInfo;
+            set { _databaseInfo = value; OnPropertyChanged(nameof(DatabaseInfo)); }
+        }
+
+        private string _activeQuestsInfo = "No active quests";
+        public string ActiveQuestsInfo
+        {
+            get => _activeQuestsInfo;
+            set { _activeQuestsInfo = value; OnPropertyChanged(nameof(ActiveQuestsInfo)); }
+        }
+
+        #endregion
+
+        #region Public Methods
+
+        /// <summary>Refresh everything</summary>
+        public void RefreshAll()
+        {
+            // Save currently tracked quest IDs before refresh
+            var currentlyTracked = AllQuests.Where(q => q.IsTracked).Select(q => q.QuestId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            
+            LoadQuests();
+            
+            // Restore tracked state
+            foreach (var quest in AllQuests)
+            {
+                if (currentlyTracked.Contains(quest.QuestId))
+                {
+                    quest._isTracked = true; // Set directly to avoid triggering save
+                }
+            }
+            
+            ApplyFilter();
+            UpdateInfo();
+        }
+
+        /// <summary>Refresh with fresh data from API</summary>
+        public async Task RefreshFromApiAsync()
+        {
+            try
+            {
+                // Save currently tracked quest IDs
+                var currentlyTracked = AllQuests.Where(q => q.IsTracked).Select(q => q.QuestId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                
+                // Try to fetch fresh data from API
+                await TarkovDataManager.RefreshFromApiAsync();
+                
+                LoadQuests();
+                
+                // Restore tracked state
+                foreach (var quest in AllQuests)
+                {
+                    if (currentlyTracked.Contains(quest.QuestId))
+                    {
+                        quest._isTracked = true;
+                    }
+                }
+                
+                ApplyFilter();
+                UpdateInfo();
+            }
+            catch
+            {
+                // If API fails, just do a normal refresh with cached data
+                RefreshAll();
+            }
+        }
+
+        /// <summary>Toggle select all visible quests</summary>
+        public void ToggleSelectAll()
+        {
+            bool allSelected = FilteredQuests.All(q => q.IsTracked);
+            foreach (var quest in FilteredQuests)
+                quest.IsTracked = !allSelected;
+            
+            SaveTrackedQuests();
+            UpdateSelectAllButton();
+            UpdateCounts();
+        }
+
+        /// <summary>Called when quest tracking changes</summary>
+        public void OnTrackingChanged()
+        {
+            SaveTrackedQuests();
+            UpdateSelectAllButton();
+            UpdateCounts();
+        }
+
+        /// <summary>Update current map for filtering</summary>
+        public void UpdateCurrentMap(string mapId, bool isInRaid)
+        {
+            if (_currentMapId != mapId || _isInRaid != isInRaid)
+            {
+                _currentMapId = mapId;
+                _isInRaid = isInRaid;
+                OnPropertyChanged(nameof(ActiveOnlyStatusText));
+                if (ActiveOnly)
+                    ApplyFilter();
+            }
+        }
+
+        #endregion
+
+        #region Private Methods
+
+        private void LoadQuests()
+        {
+            AllQuests.Clear();
+
+            if (!QuestDatabase.IsInitialized)
+            {
+                DatabaseInfo = "Quest database not loaded";
+                return;
+            }
+
+            DatabaseInfo = $"Quest Database: {QuestDatabase.AllQuests.Count} quests, {QuestDatabase.AllZones.Count} zones";
+
+            var questManager = Memory.Game?.QuestManager;
+            var activeIds = questManager?.ActiveQuests.Select(q => q.Id).ToHashSet(StringComparer.OrdinalIgnoreCase) 
+                          ?? new HashSet<string>();
+            var trackedIds = App.Config.QuestHelper.TrackedQuests;
+
+            foreach (var quest in QuestDatabase.AllQuests.Values.OrderBy(q => q.TraderName).ThenBy(q => q.Name))
+            {
+                bool isActive = activeIds.Contains(quest.Id);
+                var entry = new QuestTrackingEntry(this)
+                {
+                    QuestId = quest.Id,
+                    QuestName = quest.Name,
+                    TraderName = quest.TraderName ?? "Unknown",
+                    MapId = quest.MapId,
+                    RequiredItemCount = quest.RequiredItemIds?.Count ?? 0,
+                    RequiredZoneCount = quest.RequiredZoneIds?.Count ?? 0,
+                    IsActive = isActive,
+                    IsTracked = trackedIds.Count == 0 ? isActive : trackedIds.Contains(quest.Id)
+                };
+                AllQuests.Add(entry);
+            }
+        }
+
+        private void ApplyFilter()
+        {
+            FilteredQuests.Clear();
+
+            foreach (var quest in AllQuests)
+            {
+                if (!PassesFilter(quest)) continue;
+                FilteredQuests.Add(quest);
+            }
+
+            UpdateSelectAllButton();
+            UpdateCounts();
+        }
+
+        private bool PassesFilter(QuestTrackingEntry quest)
+        {
+            // Search filter
+            if (!string.IsNullOrWhiteSpace(SearchFilter))
+            {
+                if (!quest.QuestName.Contains(SearchFilter, StringComparison.OrdinalIgnoreCase) &&
+                    !quest.TraderName.Contains(SearchFilter, StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+
+            // Active Only filter: when enabled and in raid, show only active quests for current map
+            if (ActiveOnly && _isInRaid)
+            {
+                if (!quest.IsActive) return false;
+                if (!IsQuestForMap(quest.QuestId, _currentMapId)) return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsQuestForMap(string questId, string mapId)
+        {
+            if (string.IsNullOrEmpty(mapId)) return true;
+            if (!TarkovDataManager.TaskData.TryGetValue(questId, out var task)) return true;
+
+            // Check task map
+            if (task.Map?.NameId != null)
+                return IsMapMatch(task.Map.NameId, mapId);
+
+            // Check objective zones
+            if (task.Objectives != null)
+            {
+                foreach (var obj in task.Objectives)
+                {
+                    if (obj.Zones != null)
+                        foreach (var zone in obj.Zones)
+                            if (zone.Map?.NameId != null && IsMapMatch(zone.Map.NameId, mapId))
+                                return true;
+                }
+            }
+
+            return true; // No map restriction
+        }
+
+        private static bool IsMapMatch(string a, string b)
+        {
+            if (a.Equals(b, StringComparison.OrdinalIgnoreCase)) return true;
+            // Factory aliases
+            if (IsFactory(a) && IsFactory(b)) return true;
+            // Ground Zero aliases
+            if (IsSandbox(a) && IsSandbox(b)) return true;
+            return false;
+        }
+
+        private static bool IsFactory(string m) => m.Contains("factory", StringComparison.OrdinalIgnoreCase);
+        private static bool IsSandbox(string m) => m.Contains("sandbox", StringComparison.OrdinalIgnoreCase);
+
+        private void SaveTrackedQuests()
+        {
+            App.Config.QuestHelper.TrackedQuests.Clear();
+            foreach (var q in AllQuests.Where(x => x._isTracked))
+                App.Config.QuestHelper.TrackedQuests.Add(q.QuestId);
+            
+            // Save config to disk
+            _ = App.Config.SaveAsync();
+        }
+
+        private void UpdateSelectAllButton()
+        {
+            bool all = FilteredQuests.Count > 0 && FilteredQuests.All(q => q.IsTracked);
+            SelectAllButtonText = all ? "Deselect All" : "Select All";
+        }
+
+        private void UpdateCounts()
+        {
+            OnPropertyChanged(nameof(TrackedQuestCount));
+            OnPropertyChanged(nameof(TotalQuestCount));
+            OnPropertyChanged(nameof(VisibleQuestCount));
+        }
+
+        private void UpdateInfo()
+        {
+            _currentMapId = Memory.MapID;
+            _isInRaid = Memory.Game?.QuestManager != null;
+
+            if (!_isInRaid || Memory.Game?.QuestManager == null)
+            {
+                ActiveQuestsInfo = "No active quests (not in raid)";
+                return;
+            }
+
+            var tracked = AllQuests.Where(q => q.IsTracked && q.IsActive).ToList();
+            if (tracked.Count == 0)
+            {
+                ActiveQuestsInfo = "No tracked quests active";
+                return;
+            }
+
+            ActiveQuestsInfo = $"Tracked Quests: {tracked.Count}\n" + 
+                              string.Join("\n", tracked.Take(5).Select(q => $"  > {q.QuestName}"));
+            if (tracked.Count > 5)
+                ActiveQuestsInfo += $"\n  ... and {tracked.Count - 5} more";
+        }
+
+        private static string GetMapName(string mapId) => mapId switch
+        {
+            "factory4_day" => "Factory (Day)",
+            "factory4_night" => "Factory (Night)",
+            "bigmap" => "Customs",
+            "interchange" => "Interchange",
+            "woods" => "Woods",
+            "shoreline" => "Shoreline",
+            "rezervbase" => "Reserve",
+            "laboratory" => "Labs",
+            "lighthouse" => "Lighthouse",
+            "tarkovstreets" => "Streets",
+            "sandbox" or "sandbox_high" => "Ground Zero",
+            _ => mapId ?? "Unknown"
+        };
+
+        #endregion
+    }
+
+    /// <summary>
+    /// Quest entry for the tracking list
+    /// </summary>
+    public sealed class QuestTrackingEntry : INotifyPropertyChanged
+    {
+        private readonly QuestHelperViewModel _parent;
+        internal bool _isTracked;  // internal so RefreshAll can set without triggering save
+        private bool _isActive;
+        private bool _isExpanded;
+        private bool _objectivesLoaded;
+        private string _requiredKeysInfo;
+        private string _requiredItemsInfo;
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        private void OnPropertyChanged(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+        public QuestTrackingEntry(QuestHelperViewModel parent) => _parent = parent;
+
+        public string QuestId { get; set; }
+        public string QuestName { get; set; }
+        public string TraderName { get; set; }
+        public string MapId { get; set; }
+        public int RequiredItemCount { get; set; }
+        public int RequiredZoneCount { get; set; }
+
+        public bool IsTracked
+        {
+            get => _isTracked;
+            set 
+            { 
+                if (_isTracked != value)
+                {
+                    _isTracked = value; 
+                    OnPropertyChanged(nameof(IsTracked)); 
+                    _parent?.OnTrackingChanged();
+                }
+            }
+        }
+
+        public bool IsActive
+        {
+            get => _isActive;
+            set { _isActive = value; OnPropertyChanged(nameof(IsActive)); OnPropertyChanged(nameof(StatusColor)); }
+        }
+
+        public bool IsExpanded
+        {
+            get => _isExpanded;
+            set { _isExpanded = value; OnPropertyChanged(nameof(IsExpanded)); OnPropertyChanged(nameof(ExpandButtonText)); }
+        }
+
+        public void ToggleExpanded()
+        {
+            IsExpanded = !IsExpanded;
+            if (IsExpanded && !_objectivesLoaded)
+                LoadObjectives();
+        }
+
+        // Use simple ASCII characters that work in all fonts
+        public string ExpandButtonText => IsExpanded ? "-" : "+";
+        
+        public Brush StatusColor => IsActive ? Brushes.ForestGreen : Brushes.Transparent;
+        
+        public string RequirementsInfo
+        {
+            get
+            {
+                var parts = new List<string>();
+                if (RequiredItemCount > 0) parts.Add($"{RequiredItemCount} items");
+                if (RequiredZoneCount > 0) parts.Add($"{RequiredZoneCount} zones");
+                if (!string.IsNullOrEmpty(MapId)) parts.Add(MapId);
+                return parts.Count > 0 ? string.Join(" | ", parts) : "No requirements";
+            }
+        }
+
+        /// <summary>
+        /// Header text showing required keys and items for quick reference
+        /// Format: "Objectives: KEY: Room 114 | ITEM: Salewa x3"
+        /// </summary>
+        public string ObjectivesHeaderText
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(_requiredKeysInfo) && string.IsNullOrEmpty(_requiredItemsInfo))
+                    return "Objectives:";
+                
+                var parts = new List<string> { "Objectives:" };
+                if (!string.IsNullOrEmpty(_requiredKeysInfo))
+                    parts.Add(_requiredKeysInfo);
+                if (!string.IsNullOrEmpty(_requiredItemsInfo))
+                    parts.Add(_requiredItemsInfo);
+                return string.Join(" | ", parts);
+            }
+        }
+
+        public string TooltipText => $"{TraderName} - {QuestName}\n{RequirementsInfo}";
+        public bool HasNoObjectives => _objectivesLoaded && Objectives.Count == 0;
+
+        public ObservableCollection<QuestObjectiveEntry> Objectives { get; } = new();
+
+        private void LoadObjectives()
+        {
+            _objectivesLoaded = true;
+            Objectives.Clear();
+            
+            var keyNames = new List<string>();
+            var questItemNames = new List<string>();
+            var regularItemNames = new List<string>();
+
+            if (!TarkovDataManager.TaskData.TryGetValue(QuestId, out var task))
+            {
+                OnPropertyChanged(nameof(HasNoObjectives));
+                OnPropertyChanged(nameof(ObjectivesHeaderText));
+                return;
+            }
+
+            // First: Collect NeededKeys from task level (these are the keys required for the quest)
+            if (task.NeededKeys != null)
+            {
+                foreach (var keyGroup in task.NeededKeys)
+                {
+                    if (keyGroup.Keys != null)
+                    {
+                        foreach (var key in keyGroup.Keys)
+                        {
+                            if (!string.IsNullOrEmpty(key.Name))
+                            {
+                                // Use the full name from the API for keys
+                                keyNames.Add(key.Name);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Process objectives
+            if (task.Objectives != null)
+            {
+                foreach (var obj in task.Objectives)
+                {
+                    // Determine the count
+                    int count = obj.Count;
+                    
+                    // For shoot objectives, try to extract count from description if not set
+                    if (obj.Type == QuestObjectiveType.Shoot && count <= 0 && !string.IsNullOrEmpty(obj.Description))
+                    {
+                        // Try to find numbers like "25 Scavs", "Eliminate 15", etc.
+                        var match = System.Text.RegularExpressions.Regex.Match(obj.Description, @"\b(\d+)\b");
+                        if (match.Success && int.TryParse(match.Groups[1].Value, out var parsed) && parsed > 0 && parsed < 1000)
+                            count = parsed;
+                    }
+                    
+                    // Also check for giveItem/findItem if count not set
+                    if ((obj.Type == QuestObjectiveType.FindItem || obj.Type == QuestObjectiveType.GiveItem) && count <= 0)
+                    {
+                        count = 1; // Default to 1 for find/give objectives
+                    }
+
+                    // Collect required keys from objective level
+                    if (obj.RequiredKeys != null)
+                    {
+                        foreach (var keyGroup in obj.RequiredKeys)
+                        {
+                            foreach (var key in keyGroup)
+                            {
+                                if (!string.IsNullOrEmpty(key.Name))
+                                    keyNames.Add(key.Name);
+                            }
+                        }
+                    }
+
+                    // Collect quest item info (special quest-specific items) - use FULL name
+                    if (obj.QuestItem != null && !string.IsNullOrEmpty(obj.QuestItem.Name))
+                    {
+                        questItemNames.Add(obj.QuestItem.Name);
+                    }
+
+                    // Collect regular item info for give/find objectives - use FULL name
+                    if ((obj.Type == QuestObjectiveType.FindItem || obj.Type == QuestObjectiveType.GiveItem) && obj.Item != null)
+                    {
+                        var itemText = obj.Item.Name ?? obj.Item.ShortName;
+                        if (count > 1) itemText += $" x{count}";
+                        if (!string.IsNullOrEmpty(itemText))
+                            regularItemNames.Add(itemText);
+                    }
+
+                    Objectives.Add(new QuestObjectiveEntry
+                    {
+                        ObjectiveId = obj.Id,
+                        Type = obj.Type,
+                        Description = obj.Description ?? GetDefaultDescription(obj),
+                        Count = count,
+                        TypeIcon = GetIcon(obj.Type),
+                        ZoneCount = obj.Zones?.Count ?? 0,
+                        ItemName = obj.Item?.Name ?? obj.QuestItem?.Name,
+                        MapName = obj.Maps?.FirstOrDefault()?.Name
+                    });
+                }
+            }
+            
+            // Build header info with exact API names (full names)
+            
+            // Add keys (deduplicated)
+            var distinctKeys = keyNames.Distinct().ToList();
+            if (distinctKeys.Count > 0)
+            {
+                _requiredKeysInfo = "KEY: " + string.Join(", ", distinctKeys.Take(2));
+                if (distinctKeys.Count > 2)
+                    _requiredKeysInfo += $" (+{distinctKeys.Count - 2})";
+            }
+            else
+            {
+                _requiredKeysInfo = null;
+            }
+
+            // Add quest items (special items) - use Q: prefix
+            var distinctQuestItems = questItemNames.Distinct().ToList();
+            
+            // Add regular items
+            var distinctRegularItems = regularItemNames.Distinct().ToList();
+            
+            // Combine items for display
+            var allItems = new List<string>();
+            foreach (var qi in distinctQuestItems.Take(2))
+                allItems.Add($"Q:{qi}");
+            foreach (var ri in distinctRegularItems.Take(2))
+                allItems.Add(ri);
+            
+            if (allItems.Count > 0)
+            {
+                _requiredItemsInfo = "ITEM: " + string.Join(", ", allItems.Take(2));
+                int remaining = allItems.Count - 2;
+                if (remaining > 0)
+                    _requiredItemsInfo += $" (+{remaining})";
+            }
+            else
+            {
+                _requiredItemsInfo = null;
+            }
+
+            OnPropertyChanged(nameof(HasNoObjectives));
+            OnPropertyChanged(nameof(ObjectivesHeaderText));
+        }
+
+        private static string GetDefaultDescription(TarkovDataManager.TaskElement.ObjectiveElement obj)
+        {
+            return obj.Type switch
+            {
+                QuestObjectiveType.FindItem => $"Find {obj.Item?.Name ?? obj.Item?.ShortName ?? "item"}" + (obj.Count > 1 ? $" x{obj.Count}" : "") + (obj.FoundInRaid ? " (FIR)" : ""),
+                QuestObjectiveType.GiveItem => $"Hand over {obj.Item?.Name ?? obj.Item?.ShortName ?? "item"}" + (obj.Count > 1 ? $" x{obj.Count}" : ""),
+                QuestObjectiveType.FindQuestItem => $"Find quest item: {obj.QuestItem?.Name ?? "unknown"}",
+                QuestObjectiveType.GiveQuestItem => $"Hand over quest item: {obj.QuestItem?.Name ?? "unknown"}",
+                QuestObjectiveType.Visit => $"Visit location" + (obj.Zones?.Count > 0 ? $" ({obj.Zones.Count} zones)" : ""),
+                QuestObjectiveType.Mark => $"Mark location" + (obj.MarkerItem != null ? $" with {obj.MarkerItem.Name}" : ""),
+                QuestObjectiveType.PlantItem => $"Plant {obj.MarkerItem?.Name ?? "item"}",
+                QuestObjectiveType.PlantQuestItem => $"Plant quest item",
+                QuestObjectiveType.Shoot => $"Eliminate {(obj.Count > 0 ? $"{obj.Count} " : "")}targets",
+                QuestObjectiveType.Extract => "Survive and extract",
+                QuestObjectiveType.BuildWeapon => "Build weapon",
+                QuestObjectiveType.Skill => $"Level skill",
+                QuestObjectiveType.TraderLevel => $"Reach trader level",
+                _ => obj._type ?? "Complete objective"
+            };
+        }
+
+        private static string GetIcon(QuestObjectiveType type) => type switch
+        {
+            QuestObjectiveType.FindItem or QuestObjectiveType.FindQuestItem => "FIND",
+            QuestObjectiveType.GiveItem or QuestObjectiveType.GiveQuestItem => "GIVE",
+            QuestObjectiveType.Visit => "GO",
+            QuestObjectiveType.Mark or QuestObjectiveType.PlantItem or QuestObjectiveType.PlantQuestItem => "MARK",
+            QuestObjectiveType.Shoot => "KILL",
+            QuestObjectiveType.Extract => "EXIT",
+            QuestObjectiveType.BuildWeapon => "BUILD",
+            QuestObjectiveType.Skill => "SKILL",
+            QuestObjectiveType.TraderLevel => "LVL",
+            _ => "TASK"
+        };
+    }
+
+    /// <summary>
+    /// Quest objective entry
+    /// </summary>
+    public sealed class QuestObjectiveEntry : INotifyPropertyChanged
+    {
+        private bool _isCompleted;
+        private int _currentCount;
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        public string ObjectiveId { get; set; }
+        public QuestObjectiveType Type { get; set; }
+        public string TypeIcon { get; set; }
+        public string Description { get; set; }
+        public int Count { get; set; }
+        public int ZoneCount { get; set; }
+        public string ItemName { get; set; }
+        public string MapName { get; set; }
+
+        public int CurrentCount
+        {
+            get => _currentCount;
+            set 
+            { 
+                _currentCount = value; 
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CurrentCount)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ProgressText)));
+            }
+        }
+
+        public bool IsCompleted
+        {
+            get => _isCompleted;
+            set 
+            { 
+                _isCompleted = value; 
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsCompleted)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(TextColor)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(BackgroundColor)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(TextDecoration)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ProgressText)));
+            }
+        }
+
+        /// <summary>
+        /// Progress text - shows counter for countable objectives (kill, find, give, etc.)
+        /// Always shows for Shoot objectives, even if count is 0
+        /// </summary>
+        public string ProgressText
+        {
+            get
+            {
+                if (IsCompleted)
+                    return "DONE";
+                
+                // Always show counter for kill/shoot objectives
+                if (Type == QuestObjectiveType.Shoot)
+                    return $"{CurrentCount}/{(Count > 0 ? Count : "?")}";
+                
+                // Show counter for any objective with a count > 0
+                if (Count > 0)
+                    return $"{CurrentCount}/{Count}";
+                
+                return "";
+            }
+        }
+
+        /// <summary>
+        /// True if this objective has a visible progress counter
+        /// </summary>
+        public bool HasProgress => Type == QuestObjectiveType.Shoot || Count > 0;
+
+        public Brush TextColor => IsCompleted ? Brushes.LimeGreen : Brushes.White;
+        public Brush BackgroundColor => IsCompleted 
+            ? new SolidColorBrush(Color.FromRgb(26, 58, 26)) 
+            : new SolidColorBrush(Color.FromRgb(30, 30, 30));
+        public TextDecorationCollection TextDecoration => IsCompleted ? TextDecorations.Strikethrough : null;
+
+        public string AdditionalInfo
+        {
+            get
+            {
+                var parts = new List<string>();
+                if (!string.IsNullOrEmpty(ItemName)) parts.Add($"Item: {ItemName}");
+                if (ZoneCount > 0) parts.Add($"Zones: {ZoneCount}");
+                if (!string.IsNullOrEmpty(MapName)) parts.Add($"Map: {MapName}");
+                return parts.Count > 0 ? string.Join(" | ", parts) : null;
+            }
+        }
+
+        public bool HasAdditionalInfo => !string.IsNullOrEmpty(AdditionalInfo);
+    }
+}

@@ -26,12 +26,13 @@ SOFTWARE.
  *
 */
 
+using Collections.Pooled;
+using LoneEftDmaRadar.DMA;
 using LoneEftDmaRadar.Tarkov.GameWorld.Player;
 using LoneEftDmaRadar.Tarkov.Unity;
 using LoneEftDmaRadar.Tarkov.Unity.Structures;
 using LoneEftDmaRadar.UI.Radar.Maps;
 using LoneEftDmaRadar.UI.Skia;
-using VmmSharpEx.Extensions;
 using VmmSharpEx.Scatter;
 
 namespace LoneEftDmaRadar.Tarkov.GameWorld.Explosives
@@ -53,7 +54,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Explosives
 
         public Grenade(ulong baseAddr, ConcurrentDictionary<ulong, IExplosiveItem> parent)
         {
-            baseAddr.ThrowIfInvalidUserVA(nameof(baseAddr));
+            baseAddr.ThrowIfInvalidVirtualAddress(nameof(baseAddr));
             Addr = baseAddr;
             _parent = parent;
             var type = ObjectClass.ReadName(baseAddr, 64, false);
@@ -62,8 +63,17 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Explosives
                 _isSmoke = true;
                 return;
             }
-            var ti = Memory.ReadPtrChain(baseAddr, false, UnitySDK.UnityOffsets.TransformChain);
-            _transform = new UnityTransform(ti);
+
+            // Transform chain can be invalid if the grenade is already destroyed/invalid; fail fast.
+            try
+            {
+                var ti = Memory.ReadPtrChain(baseAddr, false, UnitySDK.UnityOffsets.TransformChain);
+                _transform = new UnityTransform(ti);
+            }
+            catch
+            {
+                throw; // bubble to caller to drop this grenade instance
+            }
         }
 
         /// <summary>
@@ -86,11 +96,11 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Explosives
                     _ = _parent.TryRemove(Addr, out _);
                     return;
                 }
-                if (x1.ReadPooled<UnityTransform.TrsX>(_transform.VerticesAddr, _transform.Count) is IMemoryOwner<UnityTransform.TrsX> vertices)
+                if (x1.ReadArray<UnityTransform.TrsX>(_transform.VerticesAddr, _transform.Count) is PooledMemory<UnityTransform.TrsX> vertices)
                 {
                     using (vertices)
                     {
-                        _ = _transform.UpdatePosition(vertices.Memory.Span);
+                        _ = _transform.UpdatePosition(vertices.Span);
                     }
                 }
             };

@@ -27,9 +27,11 @@ SOFTWARE.
 */
 
 using LiteDB;
+using LoneEftDmaRadar.DMA;
 using LoneEftDmaRadar.Misc;
 using LoneEftDmaRadar.Misc.Services;
 using LoneEftDmaRadar.Tarkov.GameWorld.Player.Helpers;
+using LoneEftDmaRadar.UI.Misc;
 using LoneEftDmaRadar.Web.EftApiTech;
 using LoneEftDmaRadar.Web.ProfileApi.Schema;
 using LoneEftDmaRadar.Web.TarkovDev.Profiles;
@@ -66,7 +68,7 @@ namespace LoneEftDmaRadar.Web.ProfileApi
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"[EFTProfileService] Unhandled Exception: {ex}");
+                        DebugLogger.LogDebug($"[EFTProfileService] Unhandled Exception: {ex}");
                     }
                 },
                 new ExecutionDataflowBlockOptions
@@ -75,7 +77,7 @@ namespace LoneEftDmaRadar.Web.ProfileApi
                     BoundedCapacity = DataflowBlockOptions.Unbounded,
                     EnsureOrdered = false
                 });
-                Memory.RaidStopped += MemDMA_RaidStopped;
+                MemDMA.RaidStopped += MemDMA_RaidStopped;
             }
         }
 

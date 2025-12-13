@@ -6,14 +6,15 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="Loading…"
-        SizeToContent="WidthAndHeight"
+        Width="550"
+        Height="320"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
         Topmost="True"
-        Background="White"
-        AllowsTransparency="False"
+        Background="Transparent"
+        AllowsTransparency="True"
         Icon="/lone-icon.ico">
 
     <!-- design-time only -->
@@ -22,23 +23,196 @@
                           IsDesignTimeCreatable="False"/>
     </d:Window.DataContext>
 
-    <Border CornerRadius="2"
-            Padding="40"
-            Background="White"
-            BorderBrush="Gray"
+    <Border CornerRadius="12"
+            Padding="30,25"
+            Background="{DynamicResource App.CardBrush}"
+            BorderBrush="{DynamicResource App.BorderBrush}"
             BorderThickness="1">
-        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-            <TextBlock Text="{Binding StatusText}"
+        <Border.Effect>
+            <DropShadowEffect Color="Black" 
+                            Direction="315" 
+                            ShadowDepth="8" 
+                            Opacity="0.5" 
+                            BlurRadius="15"/>
+        </Border.Effect>
+        
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            
+            <!-- Title -->
+            <TextBlock Grid.Row="0"
+                       Text="EFT DMA Radar"
                        FontSize="28"
-                       Margin="0,0,0,20"
-                       TextAlignment="Center" Foreground="Black"/>
-            <ProgressBar Minimum="0"
-                         Maximum="100"
-                         Value="{Binding Progress}"
-                         Height="40"
-                         Width="600"
-                         Foreground="Green"
-                         Background="#EEE"/>
-        </StackPanel>
+                       FontWeight="Bold"
+                       Margin="0,0,0,8"
+                       TextAlignment="Center"
+                       Foreground="{DynamicResource App.TextPrimaryBrush}"/>
+            
+            <!-- Status Text -->
+            <TextBlock Grid.Row="1"
+                       Text="{Binding StatusText}"
+                       FontSize="16"
+                       Margin="0,0,0,16"
+                       TextAlignment="Center"
+                       Foreground="{DynamicResource App.TextMutedBrush}"/>
+            
+            <!-- Main Content: Progress Bar -->
+            <StackPanel Grid.Row="2" 
+                        HorizontalAlignment="Center" 
+                        VerticalAlignment="Center">
+                <!-- Progress Bar Container -->
+                <StackPanel Margin="0,0,0,12" Width="480">
+                    <!-- Progress Bar -->
+                    <Grid Height="10" Margin="0,0,0,8">
+                        <!-- Background -->
+                        <Border Height="10"
+                                CornerRadius="5"
+                                Background="{DynamicResource App.BorderBrush}">
+                            <Border.Effect>
+                                <DropShadowEffect Color="#4DA3FF" 
+                                                Direction="0" 
+                                                ShadowDepth="0" 
+                                                Opacity="0.3" 
+                                                BlurRadius="8"/>
+                            </Border.Effect>
+                        </Border>
+                        <!-- Progress Fill -->
+                        <Border x:Name="ProgressFill"
+                                HorizontalAlignment="Left"
+                                Height="10"
+                                CornerRadius="5"
+                                ClipToBounds="True">
+                            <Border.Width>
+                                <Binding Path="Progress">
+                                    <Binding.Converter>
+                                        <vm:ProgressToWidthConverter/>
+                                    </Binding.Converter>
+                                    <Binding.ConverterParameter>480</Binding.ConverterParameter>
+                                </Binding>
+                            </Border.Width>
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <GradientStop Color="#4DA3FF" Offset="0"/>
+                                    <GradientStop Color="#6BB5FF" Offset="0.5"/>
+                                    <GradientStop Color="#8BC5FF" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <!-- Pulse Effect -->
+                            <Ellipse x:Name="PulseEllipse"
+                                     Width="20"
+                                     Height="20"
+                                     HorizontalAlignment="Right"
+                                     VerticalAlignment="Center"
+                                     Margin="0,0,-10,0"
+                                     Opacity="0.7"
+                                     RenderTransformOrigin="0.5,0.5">
+                                <Ellipse.RenderTransform>
+                                    <TransformGroup>
+                                        <ScaleTransform x:Name="PulseScaleTransform" ScaleX="1" ScaleY="1"/>
+                                    </TransformGroup>
+                                </Ellipse.RenderTransform>
+                                <Ellipse.Fill>
+                                    <RadialGradientBrush>
+                                        <GradientStop Color="#FFFFFF" Offset="0"/>
+                                        <GradientStop Color="#4DA3FF" Offset="0.5"/>
+                                        <GradientStop Color="Transparent" Offset="1"/>
+                                    </RadialGradientBrush>
+                                </Ellipse.Fill>
+                            </Ellipse>
+                        </Border>
+                    </Grid>
+                    
+                    <!-- Progress Percentage -->
+                    <TextBlock Text="{Binding ProgressText}"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,8"
+                               TextAlignment="Center"
+                               Foreground="{DynamicResource App.AccentBrush}"/>
+                    
+                    <!-- Current Step -->
+                    <TextBlock Text="{Binding CurrentStep}"
+                               FontSize="12"
+                               TextAlignment="Center"
+                               Foreground="{DynamicResource App.TextMutedBrush}"
+                               TextWrapping="Wrap"
+                               MaxWidth="480"/>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
     </Border>
+    
+    <Window.Resources>
+        <vm:ProgressToWidthConverter x:Key="ProgressToWidthConverter"/>
+        
+        <!-- Smooth Progress Bar Animation -->
+        <Storyboard x:Key="ProgressAnimation" x:Shared="False">
+            <DoubleAnimation Storyboard.TargetName="ProgressFill"
+                           Storyboard.TargetProperty="Width"
+                           Duration="0:0:0.4">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+        
+        <!-- Pulse Effect Animation -->
+        <Storyboard x:Key="PulseAnimation" x:Shared="False" RepeatBehavior="Forever">
+            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="PulseEllipse"
+                                          Storyboard.TargetProperty="Opacity"
+                                          Duration="0:0:1.2">
+                <EasingDoubleKeyFrame KeyTime="0:0:0" Value="0.3"/>
+                <EasingDoubleKeyFrame KeyTime="0:0:0.6" Value="1.0">
+                    <EasingDoubleKeyFrame.EasingFunction>
+                        <SineEase EasingMode="EaseOut"/>
+                    </EasingDoubleKeyFrame.EasingFunction>
+                </EasingDoubleKeyFrame>
+                <EasingDoubleKeyFrame KeyTime="0:0:1.2" Value="0.3">
+                    <EasingDoubleKeyFrame.EasingFunction>
+                        <SineEase EasingMode="EaseIn"/>
+                    </EasingDoubleKeyFrame.EasingFunction>
+                </EasingDoubleKeyFrame>
+            </DoubleAnimationUsingKeyFrames>
+            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="PulseScaleTransform"
+                                          Storyboard.TargetProperty="ScaleX"
+                                          Duration="0:0:1.2">
+                <EasingDoubleKeyFrame KeyTime="0:0:0" Value="0.8"/>
+                <EasingDoubleKeyFrame KeyTime="0:0:0.6" Value="1.2">
+                    <EasingDoubleKeyFrame.EasingFunction>
+                        <SineEase EasingMode="EaseOut"/>
+                    </EasingDoubleKeyFrame.EasingFunction>
+                </EasingDoubleKeyFrame>
+                <EasingDoubleKeyFrame KeyTime="0:0:1.2" Value="0.8">
+                    <EasingDoubleKeyFrame.EasingFunction>
+                        <SineEase EasingMode="EaseIn"/>
+                    </EasingDoubleKeyFrame.EasingFunction>
+                </EasingDoubleKeyFrame>
+            </DoubleAnimationUsingKeyFrames>
+            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="PulseScaleTransform"
+                                          Storyboard.TargetProperty="ScaleY"
+                                          Duration="0:0:1.2">
+                <EasingDoubleKeyFrame KeyTime="0:0:0" Value="0.8"/>
+                <EasingDoubleKeyFrame KeyTime="0:0:0.6" Value="1.2">
+                    <EasingDoubleKeyFrame.EasingFunction>
+                        <SineEase EasingMode="EaseOut"/>
+                    </EasingDoubleKeyFrame.EasingFunction>
+                </EasingDoubleKeyFrame>
+                <EasingDoubleKeyFrame KeyTime="0:0:1.2" Value="0.8">
+                    <EasingDoubleKeyFrame.EasingFunction>
+                        <SineEase EasingMode="EaseIn"/>
+                    </EasingDoubleKeyFrame.EasingFunction>
+                </EasingDoubleKeyFrame>
+            </DoubleAnimationUsingKeyFrames>
+        </Storyboard>
+    </Window.Resources>
+    
+    <Window.Triggers>
+        <EventTrigger RoutedEvent="Window.Loaded">
+            <BeginStoryboard Storyboard="{StaticResource PulseAnimation}"/>
+        </EventTrigger>
+    </Window.Triggers>
 </Window>

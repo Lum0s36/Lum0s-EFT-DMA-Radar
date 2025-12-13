@@ -1,5 +1,6 @@
-﻿using VmmSharpEx;
-using VmmSharpEx.Extensions;
+﻿using LoneEftDmaRadar.DMA;
+using LoneEftDmaRadar.UI.Misc;
+using VmmSharpEx;
 
 namespace LoneEftDmaRadar.Tarkov.Unity.Structures
 {
@@ -26,20 +27,26 @@ namespace LoneEftDmaRadar.Tarkov.Unity.Structures
             {
                 try
                 {
-                    const string signature = "48 89 05 ?? ?? ?? ?? 48 83 C4 ?? C3 33 C9";
+                    // GameObjectManager = qword_181A208D8
+                    // void CleanupGameObjectManager()
+                    // .text: 00000001801BAEFA 48 8B 35 D7 59 86 01    mov rsi, cs:qword_181A208D8
+                    // .text: 00000001801BAF01 48 85 F6                test rsi, rsi
+                    // .text: 00000001801BAF04 0F 84 F8 00 00 00       jz loc_1801BB002
+                    // .text: 00000001801BAF0A 8B 46 08                mov eax, [rsi + 8]
+                    const string signature = "48 8B 35 ? ? ? ? 48 85 F6 0F 84 ? ? ? ? 8B 46";
                     ulong gomSig = Memory.FindSignature(signature);
-                    gomSig.ThrowIfInvalidUserVA(nameof(gomSig));
+                    gomSig.ThrowIfInvalidVirtualAddress(nameof(gomSig));
                     int rva = Memory.ReadValueEnsure<int>(gomSig + 3);
                     var gomPtr = Memory.ReadValueEnsure<VmmPointer>(gomSig.AddRVA(7, rva));
-                    gomPtr.ThrowIfInvalidUserVA();
-                    Debug.WriteLine("GOM Located via Signature.");
+                    gomPtr.ThrowIfInvalid();
+                    DebugLogger.LogDebug("GOM Located via Signature.");
                     return gomPtr;
                 }
                 catch
                 {
                     var gomPtr = Memory.ReadValueEnsure<VmmPointer>(unityBase + UnitySDK.UnityOffsets.GameObjectManager);
-                    gomPtr.ThrowIfInvalidUserVA();
-                    Debug.WriteLine("GOM Located via Hardcoded Offset.");
+                    gomPtr.ThrowIfInvalid();
+                    DebugLogger.LogDebug("GOM Located via Hardcoded Offset.");
                     return gomPtr;
                 }
             }

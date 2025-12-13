@@ -35,35 +35,49 @@ namespace LoneEftDmaRadar.Tarkov.Unity
         public readonly struct UnityOffsets
         {
             public const uint GameObjectManager = 0x1A208D8;
+            public const uint AllCameras = 0x19F0100;
+            //public const uint PhysiX = 0x1ACD770;
 
             public const uint GameObject_ObjectClassOffset = 0x80;
             public const uint GameObject_ComponentsOffset = 0x58;
             public const uint GameObject_NameOffset = 0x88;
 
+            //public const uint MonoBehaviour_ObjectClassOffset = 0x38;
+            //public const uint MonoBehaviour_GameObjectOffset = 0x48;
+            //public const uint MonoBehaviour_EnabledOffset = 0x38;
+            public const uint MonoBehaviour_IsAddedOffset = 0x39;
+
             public const uint Component_ObjectClassOffset = 0x20;
             public const uint Component_GameObjectOffset = 0x58;
 
+            public const uint TransformInternal_TransformAccessOffset = 0x90;
             public const uint TransformAccess_IndexOffset = 0x98;
             public const uint TransformAccess_HierarchyOffset = 0x90;
 
             public const uint Hierarchy_VerticesOffset = 0x40;
             public const uint Hierarchy_IndicesOffset = 0x90;
+            //public const uint Hierarchy_RootPositionOffset = 0x40;
+
+            public const uint Camera_ViewMatrixOffset = 0x128;
+            public const uint Camera_FOVOffset = 0x1A8;
+            public const uint Camera_AspectRatioOffset = 0x518;
+            public const uint Camera_ZoomLevelOffset = 0xE8;
 
             public static readonly uint[] GameWorldChain =
             [
-                GameObject_ComponentsOffset,
-                0x18,
-                Component_ObjectClassOffset
+                GameObject_ComponentsOffset,        
+                0x18,                               
+                Component_ObjectClassOffset     
             ];
 
             public static readonly uint[] TransformChain =
             [
-                ObjectClass.MonoBehaviourOffset,
-                Component_GameObjectOffset,
-                GameObject_ComponentsOffset,
-                0x8,
-                Component_ObjectClassOffset,
-                0x10 // Transform Internal
+                ObjectClass.MonoBehaviourOffset,    
+                Component_GameObjectOffset,     
+                GameObject_ComponentsOffset,        
+                0x8,                                
+                Component_ObjectClassOffset,    
+                0x10                               
             ];
         }
     }

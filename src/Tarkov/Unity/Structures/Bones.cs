@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Lone EFT DMA Radar
  * Brought to you by Lone (Lone DMA)
  * 
@@ -61,6 +61,11 @@ namespace LoneEftDmaRadar.Tarkov.Unity.Structures
         HumanRForearm3 = 114,
         HumanRPalm = 115,
         HumanNeck = 132,
-        HumanHead = 133
+        HumanHead = 133,
+
+        /// <summary>
+        /// Special value used by DeviceAimbot aimbot to pick the closest visible bone automatically.
+        /// </summary>
+        Closest = 9999
     }
 }

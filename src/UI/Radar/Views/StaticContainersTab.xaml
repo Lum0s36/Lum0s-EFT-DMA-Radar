@@ -1,0 +1,73 @@
+<UserControl x:Class="LoneEftDmaRadar.UI.Radar.Views.StaticContainersTab"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:LoneEftDmaRadar.UI.Radar.ViewModels"
+             mc:Ignorable="d"
+             Padding="10">
+
+    <d:UserControl.DataContext>
+        <d:DesignInstance Type="{x:Type vm:StaticContainersViewModel}"
+                          IsDesignTimeCreatable="False" />
+    </d:UserControl.DataContext>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <GroupBox Header="Static Containers"
+                  Grid.Row="0"
+                  Margin="0,0,0,12">
+            <StackPanel>
+                <WrapPanel Margin="0,0,0,8">
+                    <CheckBox Content="Select All"
+                              ToolTip="Selects all container types for display."
+                              IsChecked="{Binding StaticContainersSelectAll, Mode=TwoWay}"
+                              Margin="0,0,16,8" />
+                    <CheckBox Content="Hide Searched"
+                              ToolTip="Hides containers that have been searched by local player."
+                              IsChecked="{Binding HideSearchedContainers, Mode=TwoWay}"
+                              Margin="0,0,16,8" />
+                </WrapPanel>
+
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                    <TextBlock Text="Search:"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0" />
+                    <TextBox Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             Width="300"
+                             VerticalAlignment="Center"
+                             ToolTip="Search containers by name or ID" />
+                </StackPanel>
+            </StackPanel>
+        </GroupBox>
+
+        <GroupBox Header="Tracked Containers"
+                  Grid.Row="1">
+            <ListBox ItemsSource="{Binding StaticContainers}"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ScrollViewer.CanContentScroll="False"
+                     MaxHeight="250"
+                     BorderThickness="0">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <VirtualizingStackPanel IsVirtualizing="True"
+                                                VirtualizationMode="Recycling" />
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <CheckBox Content="{Binding Name}"
+                                  IsChecked="{Binding IsTracked, Mode=TwoWay}"
+                                  Margin="2" />
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </GroupBox>
+    </Grid>
+</UserControl>
