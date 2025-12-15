@@ -20,9 +20,11 @@ This app has been tested on 🪟 Windows 11 25H2 (Game) and 🪟 Windows 11 23H2
 
 ## Features that are to be added in future commits ⌨️
 
-- Lootfilter and Important/Wishlist items on AI (and PMC?) gear slots indicated by either "!!" or the exact name (short)
-- Exfils show if opened, pending or closed
-- Quest tracker including zones, req. Keys and Items and only Q_items of active quests on radar/ESP/Aimview
+- Exfils show if open, pending or closed
+- Quest Helper (basic)
+   - Quest tracker including zones, req. Keys and Items and only Q_items of active quests on radar/ESP/Aimview
+   - Quest tracker widget on Radar
+- toggable Radar/Mini map in ESP
 - ...?
 
 ## Known Issues 🚨
