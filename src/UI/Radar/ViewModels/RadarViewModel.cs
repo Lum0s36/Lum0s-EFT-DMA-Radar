@@ -392,9 +392,11 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                     var map = EftMapManager.Map; // Cache ref
                     ArgumentNullException.ThrowIfNull(map, nameof(map));
                     var closestToMouse = _mouseOverItem; // cache ref
-                    // Get LocalPlayer location
-                    var localPlayerPos = localPlayer.Position;
+                    
+                    // Get LocalPlayer location - with BTR fallback
+                    var localPlayerPos = GetValidPlayerPosition(localPlayer);
                     var localPlayerMapPos = localPlayerPos.ToMapPos(map.Config);
+                    
                     if (MainWindow.Instance?.Radar?.MapSetupHelper?.ViewModel is MapSetupHelperViewModel mapSetup && mapSetup.IsVisible)
                     {
                         mapSetup.Coords = $"Unity X,Y,Z: {localPlayerPos.X},{localPlayerPos.Y},{localPlayerPos.Z}";
@@ -1006,6 +1008,60 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
             // Remove expired pings
             foreach (var key in toRemove)
                 _activePings.TryRemove(key, out _);
+        }
+
+        /// <summary>
+        /// Gets a valid position for the local player.
+        /// Falls back to BTR position if player is inside BTR and their position is invalid.
+        /// </summary>
+        private static Vector3 GetValidPlayerPosition(LocalPlayer localPlayer)
+        {
+            var pos = localPlayer.Position;
+            
+            // Check if position is valid (not zero, not NaN, not infinity)
+            if (IsValidPosition(pos))
+                return pos;
+            
+            // Position is invalid - try to use BTR position as fallback
+            // This happens when player is inside the BTR
+            var allPlayers = AllPlayers;
+            if (allPlayers != null)
+            {
+                var btrPlayer = allPlayers.OfType<BtrPlayer>().FirstOrDefault();
+                if (btrPlayer != null)
+                {
+                    var btrPos = btrPlayer.Position;
+                    if (IsValidPosition(btrPos))
+                        return btrPos;
+                }
+            }
+            
+            // Ultimate fallback - return last known good position or zero
+            return pos;
+        }
+
+        /// <summary>
+        /// Checks if a Vector3 position is valid for rendering.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool IsValidPosition(Vector3 pos)
+        {
+            // Check for NaN or Infinity
+            if (float.IsNaN(pos.X) || float.IsNaN(pos.Y) || float.IsNaN(pos.Z))
+                return false;
+            if (float.IsInfinity(pos.X) || float.IsInfinity(pos.Y) || float.IsInfinity(pos.Z))
+                return false;
+            
+            // Check for zero position (usually indicates uninitialized or invalid)
+            if (pos.X == 0 && pos.Y == 0 && pos.Z == 0)
+                return false;
+            
+            // Check for extreme values (far off map - like BTR's initial position of 9999,0,9999)
+            const float maxValidCoord = 5000f;
+            if (Math.Abs(pos.X) > maxValidCoord || Math.Abs(pos.Z) > maxValidCoord)
+                return false;
+            
+            return true;
         }
 
         #endregion
