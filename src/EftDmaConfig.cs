@@ -1376,6 +1376,18 @@ namespace LoneEftDmaRadar
         public bool ActiveOnly { get; set; } = false;
 
         /// <summary>
+        /// True if Kappa Only filter is enabled (shows only Kappa-required quests).
+        /// </summary>
+        [JsonPropertyName("kappaOnly")]
+        public bool KappaOnly { get; set; } = false;
+
+        /// <summary>
+        /// True if Lightkeeper Only filter is enabled (shows only Lightkeeper quests).
+        /// </summary>
+        [JsonPropertyName("lightkeeperOnly")]
+        public bool LightkeeperOnly { get; set; } = false;
+
+        /// <summary>
         /// Zone draw distance on radar (0 = unlimited).
         /// </summary>
         [JsonPropertyName("zoneDrawDistance")]

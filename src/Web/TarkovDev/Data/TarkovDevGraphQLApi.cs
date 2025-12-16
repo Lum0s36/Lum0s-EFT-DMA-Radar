@@ -122,6 +122,8 @@ namespace LoneEftDmaRadar.Web.TarkovDev.Data
                         id
                         tarkovDataId
                         name
+                        kappaRequired
+                        lightkeeperRequired
                         trader {
                             name
                         }

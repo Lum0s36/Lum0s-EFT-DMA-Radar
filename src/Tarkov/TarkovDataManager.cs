@@ -593,6 +593,12 @@ namespace LoneEftDmaRadar.Tarkov
             [JsonPropertyName("neededKeys")]
             public List<NeededKeyGroup> NeededKeys { get; set; }
 
+            [JsonPropertyName("kappaRequired")]
+            public bool KappaRequired { get; set; }
+
+            [JsonPropertyName("lightkeeperRequired")]
+            public bool LightkeeperRequired { get; set; }
+
             public class TaskTraderElement
             {
                 [JsonPropertyName("name")]

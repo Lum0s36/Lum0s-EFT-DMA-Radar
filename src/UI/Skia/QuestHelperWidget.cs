@@ -191,10 +191,47 @@ namespace LoneEftDmaRadar.UI.Skia
                 if (!HasObjectivesOnMap(quest.Id, mapId))
                     continue;
 
+                // Apply Kappa filter if enabled
+                if (config.KappaOnly && !IsKappaQuest(quest.Id))
+                    continue;
+
+                // Apply Lightkeeper filter if enabled
+                if (config.LightkeeperOnly && !IsLightkeeperQuest(quest.Id))
+                    continue;
+
                 var entry = CreateQuestDisplayEntry(quest);
                 if (entry != null)
                     _cachedQuests.Add(entry);
             }
+        }
+
+        /// <summary>
+        /// Checks if a quest is required for Kappa container.
+        /// </summary>
+        private static bool IsKappaQuest(string questId)
+        {
+            if (string.IsNullOrEmpty(questId))
+                return false;
+
+            if (!TarkovDataManager.TaskData.TryGetValue(questId, out var task))
+                return false;
+
+            return task.KappaRequired;
+        }
+
+        /// <summary>
+        /// Checks if a quest is required for Lightkeeper.
+        /// </summary>
+        private static bool IsLightkeeperQuest(string questId)
+        {
+            if (string.IsNullOrEmpty(questId))
+                return false;
+
+            if (!TarkovDataManager.TaskData.TryGetValue(questId, out var task))
+                return false;
+
+            return task.LightkeeperRequired || 
+                   (task.Trader?.Name?.Equals("Lightkeeper", StringComparison.OrdinalIgnoreCase) ?? false);
         }
 
         private static bool HasObjectivesOnMap(string questId, string mapId)

@@ -52,18 +52,40 @@
             <DockPanel LastChildFill="True">
                 
                 <!-- Filter Row - Docked at top -->
-                <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <CheckBox Content="Active Only (In Raid)"
-                              IsChecked="{Binding ActiveOnly, Mode=TwoWay}"
-                              FontWeight="SemiBold"
-                              ToolTip="When enabled, shows only quests that are currently active for your character on the current map. Requires being in a raid." />
-                    <TextBlock Grid.Column="1" Text="{Binding ActiveOnlyStatusText}" 
-                               Margin="12,0" Foreground="#80C0FF" FontSize="11" FontStyle="Italic" VerticalAlignment="Center" />
-                </Grid>
+                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                    <!-- First row: Active Only checkbox -->
+                    <Grid Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <CheckBox Content="Active Only (In Raid)"
+                                  IsChecked="{Binding ActiveOnly, Mode=TwoWay}"
+                                  FontWeight="SemiBold"
+                                  ToolTip="When enabled, shows only quests that are currently active for your character on the current map. Requires being in a raid." />
+                        <TextBlock Grid.Column="1" Text="{Binding ActiveOnlyStatusText}" 
+                                   Margin="12,0" Foreground="#80C0FF" FontSize="11" FontStyle="Italic" VerticalAlignment="Center" />
+                    </Grid>
+                    
+                    <!-- Second row: Additional filters -->
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <CheckBox Content="Kappa Only"
+                                  IsChecked="{Binding KappaOnly, Mode=TwoWay}"
+                                  Margin="0,0,16,0"
+                                  ToolTip="Show only quests required for Kappa container. Cannot be combined with Lightkeeper Only." />
+                        <CheckBox Content="Lightkeeper Only"
+                                  IsChecked="{Binding LightkeeperOnly, Mode=TwoWay}"
+                                  Margin="0,0,16,0"
+                                  ToolTip="Show only Lightkeeper quests. Cannot be combined with Kappa Only." />
+                        <TextBlock Text="Map:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <ComboBox ItemsSource="{Binding MapFilterOptions}"
+                                  SelectedItem="{Binding SelectedMapFilter, Mode=TwoWay}"
+                                  IsEnabled="{Binding IsMapFilterEnabled}"
+                                  Width="120"
+                                  Background="#2D2D2D"
+                                  ToolTip="Filter quests by map. Disabled when 'Active Only' is enabled (map is auto-detected in raid)." />
+                    </StackPanel>
+                </StackPanel>
 
                 <!-- Search Box - Docked at top -->
                 <TextBox DockPanel.Dock="Top" Margin="0,0,0,8"
@@ -93,9 +115,9 @@
                              BorderThickness="0"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              ScrollViewer.VerticalScrollBarVisibility="Auto"
-                             ScrollViewer.CanContentScroll="True"
-                             VirtualizingPanel.IsVirtualizing="True"
-                             VirtualizingPanel.VirtualizationMode="Recycling"
+                             ScrollViewer.CanContentScroll="False"
+                             VirtualizingPanel.IsVirtualizing="False"
+                             VirtualizingPanel.VirtualizationMode="Standard"
                              HorizontalContentAlignment="Stretch">
                         <ListBox.ItemContainerStyle>
                             <Style TargetType="ListBoxItem">

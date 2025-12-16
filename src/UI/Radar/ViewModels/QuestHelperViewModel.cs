@@ -177,9 +177,102 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                 App.Config.QuestHelper.ActiveOnly = value; 
                 OnPropertyChanged(nameof(ActiveOnly));
                 OnPropertyChanged(nameof(ActiveOnlyStatusText));
+                OnPropertyChanged(nameof(IsMapFilterEnabled)); // Map filter depends on this
+                
+                // Clear map filter when ActiveOnly is enabled (they don't make sense together)
+                if (value && !string.IsNullOrEmpty(SelectedMapFilter) && SelectedMapFilter != "All Maps")
+                {
+                    _selectedMapFilter = "All Maps";
+                    OnPropertyChanged(nameof(SelectedMapFilter));
+                }
+                
                 ApplyFilter();
             }
         }
+
+        /// <summary>
+        /// When enabled, shows only quests required for Kappa container.
+        /// </summary>
+        public bool KappaOnly
+        {
+            get => App.Config.QuestHelper.KappaOnly;
+            set 
+            { 
+                App.Config.QuestHelper.KappaOnly = value; 
+                OnPropertyChanged(nameof(KappaOnly));
+                
+                // Disable Lightkeeper filter when Kappa is enabled (mutually exclusive)
+                if (value && App.Config.QuestHelper.LightkeeperOnly)
+                {
+                    App.Config.QuestHelper.LightkeeperOnly = false;
+                    OnPropertyChanged(nameof(LightkeeperOnly));
+                }
+                
+                ApplyFilter();
+            }
+        }
+
+        /// <summary>
+        /// When enabled, shows only Lightkeeper quests.
+        /// </summary>
+        public bool LightkeeperOnly
+        {
+            get => App.Config.QuestHelper.LightkeeperOnly;
+            set 
+            { 
+                App.Config.QuestHelper.LightkeeperOnly = value; 
+                OnPropertyChanged(nameof(LightkeeperOnly));
+                
+                // Disable Kappa filter when Lightkeeper is enabled (mutually exclusive)
+                if (value && App.Config.QuestHelper.KappaOnly)
+                {
+                    App.Config.QuestHelper.KappaOnly = false;
+                    OnPropertyChanged(nameof(KappaOnly));
+                }
+                
+                ApplyFilter();
+            }
+        }
+
+        /// <summary>
+        /// Selected map filter. Empty string or "All Maps" means no filter.
+        /// </summary>
+        private string _selectedMapFilter = "All Maps";
+        public string SelectedMapFilter
+        {
+            get => _selectedMapFilter;
+            set 
+            { 
+                _selectedMapFilter = value ?? "All Maps"; 
+                OnPropertyChanged(nameof(SelectedMapFilter));
+                ApplyFilter();
+            }
+        }
+
+        /// <summary>
+        /// Map filter is only enabled when ActiveOnly is disabled.
+        /// When in raid with ActiveOnly, the map filter is automatic based on current map.
+        /// </summary>
+        public bool IsMapFilterEnabled => !ActiveOnly;
+
+        /// <summary>
+        /// Available maps for filtering.
+        /// </summary>
+        public ObservableCollection<string> MapFilterOptions { get; } = new()
+        {
+            "All Maps",
+            "Customs",
+            "Factory",
+            "Ground Zero",
+            "Interchange",
+            "Labyrinth",
+            "Labs",
+            "Lighthouse",
+            "Reserve",
+            "Shoreline",
+            "Streets",
+            "Woods"
+        };
 
         /// <summary>
         /// Status text showing the current filter state
@@ -410,6 +503,27 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                     return false;
             }
 
+            // Kappa filter - only show quests required for Kappa
+            if (KappaOnly)
+            {
+                if (!IsKappaQuest(quest.QuestId))
+                    return false;
+            }
+
+            // Lightkeeper filter - only show Lightkeeper quests
+            if (LightkeeperOnly)
+            {
+                if (!IsLightkeeperQuest(quest.QuestId))
+                    return false;
+            }
+
+            // Map filter - only show quests for selected map
+            if (!string.IsNullOrEmpty(SelectedMapFilter) && SelectedMapFilter != "All Maps")
+            {
+                if (!HasObjectivesOnMap(quest.QuestId, MapDisplayNameToId(SelectedMapFilter)))
+                    return false;
+            }
+
             // ActiveOnly filter logic:
             // - If NOT in raid: show ALL quests (ignore ActiveOnly setting)
             // - If in raid AND ActiveOnly enabled: show only active quests for current map
@@ -426,6 +540,55 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Converts display map name to internal map ID.
+        /// </summary>
+        private static string MapDisplayNameToId(string displayName) => displayName switch
+        {
+            "Customs" => "bigmap",
+            "Factory" => "factory4_day",
+            "Ground Zero" => "sandbox",
+            "Interchange" => "interchange",
+            "Labyrinth" => "labyrinth",
+            "Labs" => "laboratory",
+            "Lighthouse" => "lighthouse",
+            "Reserve" => "rezervbase",
+            "Shoreline" => "shoreline",
+            "Streets" => "tarkovstreets",
+            "Woods" => "woods",
+            _ => displayName?.ToLowerInvariant() ?? ""
+        };
+
+        /// <summary>
+        /// Checks if a quest is required for Kappa container.
+        /// </summary>
+        private static bool IsKappaQuest(string questId)
+        {
+            if (string.IsNullOrEmpty(questId))
+                return false;
+
+            if (!TarkovDataManager.TaskData.TryGetValue(questId, out var task))
+                return false;
+
+            return task.KappaRequired;
+        }
+
+        /// <summary>
+        /// Checks if a quest is required for Lightkeeper.
+        /// </summary>
+        private static bool IsLightkeeperQuest(string questId)
+        {
+            if (string.IsNullOrEmpty(questId))
+                return false;
+
+            if (!TarkovDataManager.TaskData.TryGetValue(questId, out var task))
+                return false;
+
+            // Check both the API flag and the trader name
+            return task.LightkeeperRequired || 
+                   (task.Trader?.Name?.Equals("Lightkeeper", StringComparison.OrdinalIgnoreCase) ?? false);
         }
 
         /// <summary>
@@ -570,6 +733,7 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
             "shoreline" => "Shoreline",
             "rezervbase" => "Reserve",
             "laboratory" => "Labs",
+            "labyrinth" => "Labyrinth",
             "lighthouse" => "Lighthouse",
             "tarkovstreets" => "Streets",
             "sandbox" or "sandbox_high" => "Ground Zero",

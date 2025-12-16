@@ -192,6 +192,12 @@ namespace LoneEftDmaRadar.Web.TarkovDev.Data
         [JsonPropertyName("name")]
         public string Name { get; set; }
 
+        [JsonPropertyName("kappaRequired")]
+        public bool KappaRequired { get; set; }
+
+        [JsonPropertyName("lightkeeperRequired")]
+        public bool LightkeeperRequired { get; set; }
+
         [JsonPropertyName("trader")]
         public TraderElement Trader { get; set; }
 
