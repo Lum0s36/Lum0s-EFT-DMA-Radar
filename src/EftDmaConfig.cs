@@ -1382,6 +1382,25 @@ namespace LoneEftDmaRadar
         public float ZoneDrawDistance { get; set; } = 100f;
 
         /// <summary>
+        /// True if the Quest Helper Widget is shown on the radar.
+        /// </summary>
+        [JsonPropertyName("showWidget")]
+        public bool ShowWidget { get; set; } = false;
+
+        /// <summary>
+        /// True if the Quest Helper Widget is minimized.
+        /// </summary>
+        [JsonPropertyName("widgetMinimized")]
+        public bool WidgetMinimized { get; set; } = false;
+
+        /// <summary>
+        /// Quest Helper Widget Location on radar.
+        /// </summary>
+        [JsonPropertyName("widgetLocation")]
+        [JsonConverter(typeof(SKRectJsonConverter))]
+        public SKRect WidgetLocation { get; set; }
+
+        /// <summary>
         /// Set of tracked quest IDs.
         /// </summary>
         [JsonPropertyName("trackedQuests")]

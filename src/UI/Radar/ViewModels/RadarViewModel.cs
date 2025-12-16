@@ -201,6 +201,10 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
         /// Loot Info Widget Viewport.
         /// </summary>
         public LootInfoWidget LootInfoWidget { get; private set; }
+        /// <summary>
+        /// Quest Helper Widget Viewport.
+        /// </summary>
+        public QuestHelperWidget QuestHelperWidget { get; private set; }
 
         public RadarViewModel(RadarTab parent)
         {
@@ -250,12 +254,21 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                     App.Config.LootInfoWidget.Location = new SKRect(cr.Left, cr.Top, cr.Left + 300, cr.Top + 400);
                 }
 
+                if (App.Config.QuestHelper.WidgetLocation == default)
+                {
+                    var size = Radar.CanvasSize;
+                    var cr = new SKRect(0, 0, size.Width, size.Height);
+                    App.Config.QuestHelper.WidgetLocation = new SKRect(cr.Right - 350, cr.Top, cr.Right, cr.Top + 300);
+                }
+
                 AimviewWidget = new AimviewWidget(Radar, App.Config.AimviewWidget.Location, App.Config.AimviewWidget.Minimized,
                     App.Config.UI.UIScale);
                 InfoWidget = new PlayerInfoWidget(Radar, App.Config.InfoWidget.Location,
                     App.Config.InfoWidget.Minimized, App.Config.UI.UIScale);
                 LootInfoWidget = new LootInfoWidget(Radar, App.Config.LootInfoWidget.Location,
                     App.Config.LootInfoWidget.Minimized, App.Config.UI.UIScale);
+                QuestHelperWidget = new QuestHelperWidget(Radar, App.Config.QuestHelper.WidgetLocation,
+                    App.Config.QuestHelper.WidgetMinimized, App.Config.UI.UIScale);
                 
                 // Subscribe to item click event for ping effect
                 LootInfoWidget.ItemClickedForPing += LootInfoWidget_ItemClickedForPing;
@@ -532,6 +545,10 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                     if (App.Config.LootInfoWidget.Enabled) // LootInfo Widget
                     {
                         LootInfoWidget?.Draw(canvas, Loot);
+                    }
+                    if (App.Config.QuestHelper.ShowWidget) // Quest Helper Widget
+                    {
+                        QuestHelperWidget?.Draw(canvas);
                     }
 
                     // Draw ripple effects for pinged loot items
