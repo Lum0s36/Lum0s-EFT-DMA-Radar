@@ -1580,9 +1580,7 @@ namespace LoneEftDmaRadar.UI.ESP
 
             // Group ID (if available)
             if (nearestPlayer.GroupID >= 0 && nearestPlayer.IsPmc && !nearestPlayer.IsAI)
-            {
                 parts.Add($"G:{nearestPlayer.GroupID}");
-            }
 
             // Combine all parts into single line
             string text = string.Join(" | ", parts);

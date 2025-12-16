@@ -105,7 +105,7 @@ namespace SDK
             public const uint AccountId = 0x18; // String
             public const uint Info = 0x48; // -.\uE9AD
             public const uint WishlistManager = 0x108; // EFT.WishlistManager
-            public const uint QuestsData = 0x90; // System.Collections.Generic.List<QuestStatusData>
+            public const uint QuestsData = 0x98; // System.Collections.Generic.List<QuestStatusData>
         }
 
         public readonly partial struct WishlistManager
@@ -357,10 +357,10 @@ namespace SDK
         public readonly partial struct QuestStatusData // EFT.Quests.QuestStatusData
         {
             public const uint Id = 0x10; // System.String (Quest Template ID)
-            public const uint Status = 0x20; // System.Int32 (EQuestStatus)
-            public const uint StartTime = 0x24; // System.Int32 (Unix timestamp)
-            public const uint AvailableAfter = 0x28; // System.Int32 (Unix timestamp)
-            public const uint CompletedConditions = 0x30; // System.Collections.Generic.HashSet<MongoID>
+            public const uint Status = 0x1C; // System.Int32 (EQuestStatus)
+            public const uint StartTime = 0x20; // System.Int32 (Unix timestamp)
+            public const uint AvailableAfter = 0x24; // System.Int32 (Unix timestamp)
+            public const uint CompletedConditions = 0x28; // System.Collections.Generic.HashSet<MongoID>
         }
 
         public readonly partial struct TriggerWithId // EFT.Interactive.TriggerWithId

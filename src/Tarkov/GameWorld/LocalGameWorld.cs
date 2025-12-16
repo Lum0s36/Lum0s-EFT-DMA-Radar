@@ -286,7 +286,12 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
         /// </summary>
         private void RealtimeWorker_PerformWork(object sender, WorkerThreadArgs e)
         {
-            var players = _rgtPlayers.Where(x => x.IsActive && x.IsAlive);
+            // Filter active and alive players
+            // Note: BTR is always included so its position can be updated
+            var players = _rgtPlayers.Where(x => 
+                x.IsActive && 
+                x.IsAlive);
+            
             var localPlayer = LocalPlayer;
             if (!players.Any()) // No players - Throttle
             {

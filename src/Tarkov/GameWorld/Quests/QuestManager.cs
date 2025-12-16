@@ -158,17 +158,26 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Quests
         private void RefreshPlayerQuests(ulong profilePtr, CancellationToken ct)
         {
             if (profilePtr == 0)
+            {
+                DebugLogger.LogDebug("[QuestManager] Profile pointer is 0, skipping quest refresh");
                 return;
+            }
 
             try
             {
                 // Profile.QuestsData is a List<QuestStatusData>
                 var questsDataPtr = Memory.ReadPtr(profilePtr + Offsets.Profile.QuestsData);
                 if (questsDataPtr == 0)
+                {
+                    DebugLogger.LogDebug("[QuestManager] QuestsData pointer is 0");
                     return;
+                }
 
                 // Read the list
-                using var questsList = UnityList<ulong>.Create(addr: questsDataPtr, useCache: true);
+                using var questsList = UnityList<ulong>.Create(addr: questsDataPtr, useCache: false); // Don't cache for fresh data
+                
+                int processedCount = 0;
+                int activeCount = 0;
 
                 foreach (var questDataAddr in questsList)
                 {
@@ -179,18 +188,24 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Quests
 
                     try
                     {
+                        // Read status first - only process Started quests (status == 2)
+                        var statusInt = Memory.ReadValue<int>(questDataAddr + Offsets.QuestStatusData.Status);
+                        var status = (EQuestStatus)statusInt;
+                        
+                        // Only process Started or AvailableForFinish quests
+                        if (status != EQuestStatus.Started && status != EQuestStatus.AvailableForFinish)
+                            continue;
+
                         // Read quest ID
                         var idPtr = Memory.ReadPtr(questDataAddr + Offsets.QuestStatusData.Id);
                         if (idPtr == 0)
                             continue;
 
-                        var questId = Memory.ReadUnicodeString(idPtr, 64, true);
+                        var questId = Memory.ReadUnicodeString(idPtr, 64, false);
                         if (string.IsNullOrEmpty(questId))
                             continue;
 
-                        // Read status
-                        var statusInt = Memory.ReadValue<int>(questDataAddr + Offsets.QuestStatusData.Status);
-                        var status = (EQuestStatus)statusInt;
+                        processedCount++;
 
                         // Get or create quest data
                         if (!_quests.TryGetValue(questId, out var quest))
@@ -212,16 +227,22 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Quests
                         quest.StartTime = Memory.ReadValue<int>(questDataAddr + Offsets.QuestStatusData.StartTime);
                         quest.AvailableAfter = Memory.ReadValue<int>(questDataAddr + Offsets.QuestStatusData.AvailableAfter);
 
+                        if (quest.IsActive)
+                            activeCount++;
+
                         // Read CompletedConditions (HashSet<MongoID>)
-                        if (status == EQuestStatus.Started || status == EQuestStatus.AvailableForFinish)
-                        {
-                            ReadCompletedConditions(questDataAddr, quest);
-                        }
+                        ReadCompletedConditions(questDataAddr, quest);
                     }
-                    catch
+                    catch (Exception ex)
                     {
                         // Skip invalid quest data
+                        DebugLogger.LogDebug($"[QuestManager] Error reading quest at 0x{questDataAddr:X}: {ex.Message}");
                     }
+                }
+                
+                if (processedCount > 0 || activeCount > 0)
+                {
+                    DebugLogger.LogDebug($"[QuestManager] Processed {processedCount} quests, {activeCount} active");
                 }
             }
             catch (Exception ex)
@@ -239,31 +260,50 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Quests
             {
                 var completedConditionsPtr = Memory.ReadPtr(questDataAddr + Offsets.QuestStatusData.CompletedConditions);
                 if (completedConditionsPtr == 0)
+                {
                     return;
+                }
+
+                // Read count first to check if there are any completed conditions
+                var count = Memory.ReadValue<int>(completedConditionsPtr + UnityHashSet<MongoID>.CountOffset, false);
+                if (count <= 0)
+                {
+                    return;
+                }
+                
+                DebugLogger.LogDebug($"[QuestManager] Quest {quest.Id}: Found {count} completed conditions in HashSet");
 
                 // Clear existing and re-read
                 quest.CompletedConditions.Clear();
 
-                using var completedHashSet = UnityHashSet<MongoID>.Create(completedConditionsPtr, true);
+                using var completedHashSet = UnityHashSet<MongoID>.Create(completedConditionsPtr, false); // Don't cache for fresh data
+                int conditionCount = 0;
                 foreach (var entry in completedHashSet)
                 {
                     try
                     {
-                        var conditionId = entry.Value.ReadString(64, true);
+                        var conditionId = entry.Value.ReadString(64, false); // Don't cache
                         if (!string.IsNullOrEmpty(conditionId))
                         {
                             quest.CompletedConditions.Add(conditionId);
+                            conditionCount++;
+                            DebugLogger.LogDebug($"[QuestManager] Quest {quest.Id}: Completed condition: {conditionId}");
                         }
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // Skip invalid entry
+                        DebugLogger.LogDebug($"[QuestManager] Error reading condition entry: {ex.Message}");
                     }
                 }
+                
+                if (conditionCount > 0)
+                {
+                    DebugLogger.LogDebug($"[QuestManager] Quest {quest.Id}: Successfully read {conditionCount} completed conditions");
+                }
             }
-            catch
+            catch (Exception ex)
             {
-                // CompletedConditions may not be available
+                DebugLogger.LogDebug($"[QuestManager] ReadCompletedConditions error for quest {quest.Id}: {ex.Message}");
             }
         }
 

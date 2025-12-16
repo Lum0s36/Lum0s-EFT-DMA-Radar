@@ -488,6 +488,7 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                         {
                             if (player == localPlayer)
                                 continue; // Already drawn local player, move on
+                            
                             player.Draw(canvas, mapParams, localPlayer);
                         }
                     }

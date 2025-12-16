@@ -39,28 +39,60 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
         {
             while (true)
             {
-                await Task.Delay(5000); // Every 5 seconds
+                await Task.Delay(3000); // Every 3 seconds
                 
                 try
                 {
-                    // Only refresh if in raid and QuestManager has data
-                    if (Memory.InRaid && Memory.Game?.QuestManager != null)
+                    // Check if we're in raid using Memory.InRaid directly
+                    if (!Memory.InRaid)
+                        continue;
+                    
+                    var questManager = Memory.Game?.QuestManager;
+                    if (questManager == null)
+                        continue;
+                    
+                    var activeQuestsFromMemory = questManager.ActiveQuests.ToList();
+                    var activeCount = activeQuestsFromMemory.Count;
+                    
+                    // Get current active count in our list
+                    var currentActiveCount = AllQuests.Count(q => q.IsActive);
+                    
+                    // Always update objective completion status for expanded quests
+                    bool needsUpdate = activeCount != currentActiveCount || (activeCount > 0 && currentActiveCount == 0);
+                    
+                    await System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() =>
                     {
-                        var questManager = Memory.Game.QuestManager;
-                        var activeCount = questManager.ActiveQuests.Count();
+                        // Update the active state directly without full refresh
+                        var activeIds = new HashSet<string>(activeQuestsFromMemory.Select(q => q.Id), StringComparer.OrdinalIgnoreCase);
                         
-                        // Check if we need to update (active quests changed)
-                        var currentActiveCount = AllQuests.Count(q => q.IsActive);
-                        if (activeCount != currentActiveCount)
+                        foreach (var quest in AllQuests)
                         {
-                            System.Diagnostics.Debug.WriteLine($"[QuestHelper] Periodic refresh: {activeCount} active quests (was {currentActiveCount})");
+                            bool wasActive = quest.IsActive;
+                            quest.IsActive = activeIds.Contains(quest.QuestId);
                             
-                            await System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() =>
+                            // Refresh objective completion status for expanded quests
+                            if (quest.IsExpanded)
                             {
-                                RefreshAll();
-                            });
+                                quest.RefreshObjectiveCompletionStatus();
+                            }
                         }
-                    }
+                        
+                        // Update map ID if needed
+                        if (_currentMapId != Memory.MapID)
+                        {
+                            _currentMapId = Memory.MapID;
+                            OnPropertyChanged(nameof(ActiveOnlyStatusText));
+                        }
+                        
+                        _isInRaid = true;
+                        
+                        if (needsUpdate)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[QuestHelper] Periodic refresh: {activeCount} active quests from memory (UI shows {currentActiveCount})");
+                            ApplyFilter();
+                            UpdateInfo();
+                        }
+                    });
                 }
                 catch (Exception ex)
                 {
@@ -76,28 +108,30 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
         {
             try
             {
-                // Use dispatcher to update UI from background thread
-                System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() =>
+                // Small delay to ensure Memory.Game is fully initialized
+                Task.Delay(500).ContinueWith(_ =>
                 {
-                    var mapId = Memory.MapID;
-                    var isInRaid = Memory.InRaid;
-                    
-                    _currentMapId = mapId;
-                    _isInRaid = isInRaid;
-                    
-                    // Automatically enable ActiveOnly filter when entering raid
-                    if (!ActiveOnly)
+                    System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() =>
                     {
-                        App.Config.QuestHelper.ActiveOnly = true;
-                        OnPropertyChanged(nameof(ActiveOnly));
-                    }
-                    
-                    // Refresh all quest data when raid starts (to get active quests from game memory)
-                    RefreshAll();
-                    
-                    OnPropertyChanged(nameof(ActiveOnlyStatusText));
-                    
-                    System.Diagnostics.Debug.WriteLine($"[QuestHelper] Raid started on map: {mapId}, filtering active quests");
+                        try
+                        {
+                            _currentMapId = Memory.MapID;
+                            _isInRaid = Memory.InRaid;
+                            
+                            System.Diagnostics.Debug.WriteLine($"[QuestHelper] Raid started - MapID: {_currentMapId}, InRaid: {_isInRaid}");
+                            
+                            // Refresh all quest data when raid starts (to get active quests from game memory)
+                            RefreshAll();
+                            
+                            OnPropertyChanged(nameof(ActiveOnlyStatusText));
+                            
+                            System.Diagnostics.Debug.WriteLine($"[QuestHelper] After refresh: {AllQuests.Count(q => q.IsActive)} active quests");
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[QuestHelper] OnRaidStarted error: {ex.Message}");
+                        }
+                    });
                 });
             }
             catch (Exception ex)
@@ -117,6 +151,14 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                 {
                     _currentMapId = null;
                     _isInRaid = false;
+                    
+                    System.Diagnostics.Debug.WriteLine("[QuestHelper] Raid stopped - clearing raid state");
+                    
+                    // Mark all quests as inactive when leaving raid
+                    foreach (var quest in AllQuests)
+                    {
+                        quest.IsActive = false;
+                    }
                     
                     // Update the active quests info
                     UpdateInfo();
@@ -596,7 +638,7 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
         /// Returns true if:
         /// - The quest's main map matches the current map
         /// - Any objective zone is on the current map
-        /// - The quest has objectives that can be done anywhere (like "hand over items" without specific zone)
+        /// - The quest has no map restrictions (can be done anywhere, like "kill X scavs")
         /// </summary>
         private static bool HasObjectivesOnMap(string questId, string mapId)
         {
@@ -655,10 +697,9 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
             if (hasMapSpecificObjective)
                 return hasAnyMapObjective;
 
-            // Quest has no map restrictions (e.g., "hand over items to trader", "reach level X")
-            // These quests are not shown for any specific map since they can be done anywhere/anytime
-            // Only show them if we're not doing map-based filtering
-            return false;
+            // Quest has no map restrictions (e.g., "kill X scavs", "kill X PMCs with grenades")
+            // These quests CAN be completed on ANY map, so show them everywhere!
+            return true;
         }
 
         private static bool IsMapMatch(string a, string b)
@@ -701,19 +742,29 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
 
         private void UpdateInfo()
         {
+            // Use Memory.InRaid directly instead of checking QuestManager
             _currentMapId = Memory.MapID;
-            _isInRaid = Memory.Game?.QuestManager != null;
+            _isInRaid = Memory.InRaid;
 
-            if (!_isInRaid || Memory.Game?.QuestManager == null)
+            if (!_isInRaid)
             {
-                ActiveQuestsInfo = "No active quests (not in raid)";
+                ActiveQuestsInfo = "Not in raid";
+                return;
+            }
+            
+            if (Memory.Game?.QuestManager == null)
+            {
+                ActiveQuestsInfo = "Waiting for quest data...";
                 return;
             }
 
             var tracked = AllQuests.Where(q => q.IsTracked && q.IsActive).ToList();
             if (tracked.Count == 0)
             {
-                ActiveQuestsInfo = "No tracked quests active";
+                var activeCount = AllQuests.Count(q => q.IsActive);
+                ActiveQuestsInfo = activeCount > 0 
+                    ? $"{activeCount} active quests (none tracked)"
+                    : "No active quests found";
                 return;
             }
 
@@ -797,8 +848,46 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
         public void ToggleExpanded()
         {
             IsExpanded = !IsExpanded;
-            if (IsExpanded && !_objectivesLoaded)
-                LoadObjectives();
+            if (IsExpanded)
+            {
+                if (!_objectivesLoaded)
+                    LoadObjectives();
+                else
+                    RefreshObjectiveCompletionStatus(); // Update completion status when re-expanding
+            }
+        }
+
+        /// <summary>
+        /// Refresh the completion status of all loaded objectives from memory.
+        /// Called when the quest is re-expanded or during periodic updates.
+        /// </summary>
+        public void RefreshObjectiveCompletionStatus()
+        {
+            if (!_objectivesLoaded || Objectives.Count == 0)
+                return;
+
+            var questManager = Memory.Game?.QuestManager;
+            if (questManager == null)
+                return;
+
+            if (!questManager.Quests.TryGetValue(QuestId, out var questData))
+                return;
+
+            var completedConditions = questData.CompletedConditions;
+            if (completedConditions == null)
+                return;
+
+            foreach (var objective in Objectives)
+            {
+                if (!string.IsNullOrEmpty(objective.ObjectiveId))
+                {
+                    bool isCompleted = completedConditions.Contains(objective.ObjectiveId);
+                    if (objective.IsCompleted != isCompleted)
+                    {
+                        objective.IsCompleted = isCompleted;
+                    }
+                }
+            }
         }
 
         // Use simple ASCII characters that work in all fonts
@@ -857,6 +946,14 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                 OnPropertyChanged(nameof(HasNoObjectives));
                 OnPropertyChanged(nameof(ObjectivesHeaderText));
                 return;
+            }
+
+            // Get completed conditions from memory (if available)
+            HashSet<string> completedConditions = null;
+            var questManager = Memory.Game?.QuestManager;
+            if (questManager != null && questManager.Quests.TryGetValue(QuestId, out var questData))
+            {
+                completedConditions = questData.CompletedConditions;
             }
 
             // First: Collect NeededKeys from task level (these are the keys required for the quest)
@@ -929,6 +1026,13 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                             regularItemNames.Add(itemText);
                     }
 
+                    // Check if this objective is completed
+                    bool isCompleted = false;
+                    if (completedConditions != null && !string.IsNullOrEmpty(obj.Id))
+                    {
+                        isCompleted = completedConditions.Contains(obj.Id);
+                    }
+
                     Objectives.Add(new QuestObjectiveEntry
                     {
                         ObjectiveId = obj.Id,
@@ -938,7 +1042,8 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                         TypeIcon = GetIcon(obj.Type),
                         ZoneCount = obj.Zones?.Count ?? 0,
                         ItemName = obj.Item?.Name ?? obj.QuestItem?.Name,
-                        MapName = obj.Maps?.FirstOrDefault()?.Name
+                        MapName = obj.Maps?.FirstOrDefault()?.Name,
+                        IsCompleted = isCompleted
                     });
                 }
             }
@@ -1081,7 +1186,7 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                 // Always show counter for kill/shoot objectives
                 if (Type == QuestObjectiveType.Shoot)
                     return $"{CurrentCount}/{(Count > 0 ? Count : "?")}";
-                
+
                 // Show counter for any objective with a count > 0
                 if (Count > 0)
                     return $"{CurrentCount}/{Count}";

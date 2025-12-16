@@ -122,12 +122,14 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
         /// <param name="btrPlayerBase">Player Base Addr for BTR Operator.</param>
         public void TryAllocateBTR(ulong btrView, ulong btrPlayerBase)
         {
-            if (_players.TryGetValue(btrPlayerBase, out var existing) && existing is not BtrPlayer)
-            {
-                var btr = new BtrPlayer(btrView, btrPlayerBase);
-                _players[btrPlayerBase] = btr;
-                Debug.WriteLine("BTR Allocated!");
-            }
+            // Skip if already a BTR
+            if (_players.TryGetValue(btrPlayerBase, out var existing) && existing is BtrPlayer)
+                return;
+            
+            // Create BTR player (either replacing existing player or adding new)
+            var btr = new BtrPlayer(btrView, btrPlayerBase);
+            _players[btrPlayerBase] = btr;
+            Debug.WriteLine($"BTR Allocated! View: 0x{btrView:X}, PlayerBase: 0x{btrPlayerBase:X}");
         }
 
         #region IReadOnlyCollection

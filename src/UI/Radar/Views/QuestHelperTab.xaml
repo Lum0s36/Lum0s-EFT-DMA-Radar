@@ -22,11 +22,19 @@
                 <Border Background="#2A2A2A" BorderBrush="#4A4A4A" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,8">
                     <StackPanel>
                         <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#FFD700" FontWeight="SemiBold" Margin="0,0,0,4">
-                            ? Limited Implementation
+                            Quest Helper Information
                         </TextBlock>
                         <TextBlock TextWrapping="Wrap" FontSize="10" Foreground="#CCCCCC">
-                            This Quest Helper is not a full implementation. It currently only provides a quick reference for quest requirements (items, keys). 
-                            Note: Kill tasks and other objectives with progress counters may not display correctly as the tracking code is not yet implemented.
+                            - Quest Tracking: Shows your active quests from the game. Enable "Active Only" to filter by current map.
+                        </TextBlock>
+                        <TextBlock TextWrapping="Wrap" FontSize="10" Foreground="#CCCCCC" Margin="0,2,0,0">
+                            - Objective Completion: Objectives are marked as "DONE" when fully completed. Progress counters (e.g., 3/12 kills) are not available as EFT does not store intermediate progress locally.
+                        </TextBlock>
+                        <TextBlock TextWrapping="Wrap" FontSize="10" Foreground="#CCCCCC" Margin="0,2,0,0">
+                            - Quest Zones: Zone markers are shown on the radar for objectives that require visiting specific locations.
+                        </TextBlock>
+                        <TextBlock TextWrapping="Wrap" FontSize="10" Foreground="#CCCCCC" Margin="0,2,0,0">
+                            - Map-agnostic quests (like "Grenadier") are shown on all maps since they can be completed anywhere.
                         </TextBlock>
                     </StackPanel>
                 </Border>
