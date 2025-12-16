@@ -184,6 +184,12 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
             set { App.Config.QuestHelper.Enabled = value; OnPropertyChanged(nameof(Enabled)); }
         }
 
+        public bool ShowZones
+        {
+            get => App.Config.QuestHelper.ShowZones;
+            set { App.Config.QuestHelper.ShowZones = value; OnPropertyChanged(nameof(ShowZones)); }
+        }
+
         public bool ShowWidget
         {
             get => App.Config.QuestHelper.ShowWidget;

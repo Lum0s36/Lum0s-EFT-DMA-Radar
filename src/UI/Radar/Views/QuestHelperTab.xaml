@@ -10,232 +10,238 @@
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
     </UserControl.Resources>
 
-    <!-- Wrap everything in a DockPanel to properly handle height -->
-    <DockPanel Margin="10" LastChildFill="True">
+    <!-- Main ScrollViewer wraps everything for scrollability -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="10">
         
-        <!-- ============================================= -->
-        <!-- SETTINGS SECTION - Docked at top -->
-        <!-- ============================================= -->
-        <GroupBox DockPanel.Dock="Top" Header="Quest Helper Settings" Margin="0,0,0,8">
-            <StackPanel>
-                <!-- Info Text about limited implementation -->
-                <Border Background="#2A2A2A" BorderBrush="#4A4A4A" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,8">
-                    <StackPanel>
-                        <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#FFD700" FontWeight="SemiBold" Margin="0,0,0,4">
-                            Quest Helper Information
-                        </TextBlock>
-                        <TextBlock TextWrapping="Wrap" FontSize="10" Foreground="#CCCCCC">
-                            - Quest Tracking: Shows your active quests from the game. Enable "Active Only" to filter by current map.
-                        </TextBlock>
-                        <TextBlock TextWrapping="Wrap" FontSize="10" Foreground="#CCCCCC" Margin="0,2,0,0">
-                            - Objective Completion: Objectives are marked as "DONE" when fully completed. Progress counters (e.g., 3/12 kills) are not available as EFT does not store intermediate progress locally.
-                        </TextBlock>
-                        <TextBlock TextWrapping="Wrap" FontSize="10" Foreground="#CCCCCC" Margin="0,2,0,0">
-                            - Quest Zones: Zone markers are shown on the radar for objectives that require visiting specific locations.
-                        </TextBlock>
-                        <TextBlock TextWrapping="Wrap" FontSize="10" Foreground="#CCCCCC" Margin="0,2,0,0">
-                            - Map-agnostic quests (like "Grenadier") are shown on all maps since they can be completed anywhere.
-                        </TextBlock>
-                    </StackPanel>
-                </Border>
+            <!-- ============================================= -->
+            <!-- SETTINGS SECTION -->
+            <!-- ============================================= -->
+            <GroupBox Header="Quest Helper Settings" Margin="0,0,0,8">
+                <StackPanel>
+                    <!-- Collapsible Info Box -->
+                    <Expander Header="Quest Helper Information" IsExpanded="False" Margin="0,0,0,8">
+                        <Border Background="#2A2A2A" BorderBrush="#4A4A4A" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,4,0,0">
+                            <StackPanel>
+                                <TextBlock TextWrapping="Wrap" FontSize="10" Foreground="#CCCCCC">
+                                    - Quest Tracking: Shows your active quests from the game. Enable "Active Only" to filter by current map.
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap" FontSize="10" Foreground="#CCCCCC" Margin="0,2,0,0">
+                                    - Objective Completion: Objectives are marked as "DONE" when fully completed. Progress counters are not available.
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap" FontSize="10" Foreground="#CCCCCC" Margin="0,2,0,0">
+                                    - Quest Zones: Zone markers are shown on the radar for objectives that require visiting specific locations.
+                                </TextBlock>
+                                <TextBlock TextWrapping="Wrap" FontSize="10" Foreground="#CCCCCC" Margin="0,2,0,0">
+                                    - Map-agnostic quests (like "Grenadier") are shown on all maps since they can be completed anywhere.
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+                    </Expander>
 
-                <TextBlock Text="{Binding DatabaseInfo}" 
-                           Margin="0,0,0,8" Foreground="LightGreen" FontWeight="SemiBold" FontSize="11" />
+                    <TextBlock Text="{Binding DatabaseInfo}" 
+                               Margin="0,0,0,6" Foreground="LightGreen" FontWeight="SemiBold" FontSize="11" />
 
-                <CheckBox Content="Enable Quest Helper"
-                          IsChecked="{Binding Enabled, Mode=TwoWay}"
-                          FontWeight="Bold" VerticalAlignment="Center" />
-                
-                <CheckBox Content="Show Quest Widget on Radar"
-                          IsChecked="{Binding ShowWidget, Mode=TwoWay}"
-                          Margin="0,4,0,0"
-                          ToolTip="Shows a widget on the radar displaying tracked quests and their objectives for the current map." />
-            </StackPanel>
-        </GroupBox>
+                    <!-- Compact checkbox row -->
+                    <WrapPanel Orientation="Horizontal">
+                        <CheckBox Content="Enable Quest Helper"
+                                  IsChecked="{Binding Enabled, Mode=TwoWay}"
+                                  FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,20,4" />
+                        
+                        <CheckBox Content="Show Zones on Radar"
+                                  IsChecked="{Binding ShowZones, Mode=TwoWay}"
+                                  VerticalAlignment="Center" Margin="0,0,20,4"
+                                  ToolTip="Shows zone markers on the radar for objectives that require visiting specific locations." />
+                        
+                        <CheckBox Content="Show Widget on Radar"
+                                  IsChecked="{Binding ShowWidget, Mode=TwoWay}"
+                                  VerticalAlignment="Center" Margin="0,0,0,4"
+                                  ToolTip="Shows a widget on the radar displaying tracked quests and their objectives for the current map." />
+                    </WrapPanel>
+                </StackPanel>
+            </GroupBox>
 
-        <!-- ============================================= -->
-        <!-- QUEST LIST SECTION - Fills remaining space -->
-        <!-- ============================================= -->
-        <GroupBox Header="Quest Tracking" IsEnabled="{Binding Enabled}">
-            <DockPanel LastChildFill="True">
-                
-                <!-- Filter Row - Docked at top -->
-                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                    <!-- First row: Active Only checkbox -->
-                    <Grid Margin="0,0,0,4">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <CheckBox Content="Active Only (In Raid)"
-                                  IsChecked="{Binding ActiveOnly, Mode=TwoWay}"
-                                  FontWeight="SemiBold"
-                                  ToolTip="When enabled, shows only quests that are currently active for your character on the current map. Requires being in a raid." />
-                        <TextBlock Grid.Column="1" Text="{Binding ActiveOnlyStatusText}" 
-                                   Margin="12,0" Foreground="#80C0FF" FontSize="11" FontStyle="Italic" VerticalAlignment="Center" />
-                    </Grid>
+            <!-- ============================================= -->
+            <!-- QUEST LIST SECTION -->
+            <!-- ============================================= -->
+            <GroupBox Header="Quest Tracking" IsEnabled="{Binding Enabled}">
+                <StackPanel>
                     
-                    <!-- Second row: Additional filters -->
-                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                        <CheckBox Content="Kappa Only"
-                                  IsChecked="{Binding KappaOnly, Mode=TwoWay}"
-                                  Margin="0,0,16,0"
-                                  ToolTip="Show only quests required for Kappa container. Cannot be combined with Lightkeeper Only." />
-                        <CheckBox Content="Lightkeeper Only"
-                                  IsChecked="{Binding LightkeeperOnly, Mode=TwoWay}"
-                                  Margin="0,0,16,0"
-                                  ToolTip="Show only Lightkeeper quests. Cannot be combined with Kappa Only." />
-                        <TextBlock Text="Map:" VerticalAlignment="Center" Margin="0,0,6,0" />
-                        <ComboBox ItemsSource="{Binding MapFilterOptions}"
-                                  SelectedItem="{Binding SelectedMapFilter, Mode=TwoWay}"
-                                  IsEnabled="{Binding IsMapFilterEnabled}"
-                                  Width="120"
-                                  Background="#2D2D2D"
-                                  ToolTip="Filter quests by map. Disabled when 'Active Only' is enabled (map is auto-detected in raid)." />
+                    <!-- Filter Row -->
+                    <StackPanel Margin="0,0,0,6">
+                        <!-- First row: Active Only checkbox -->
+                        <WrapPanel Margin="0,0,0,4">
+                            <CheckBox Content="Active Only (In Raid)"
+                                      IsChecked="{Binding ActiveOnly, Mode=TwoWay}"
+                                      FontWeight="SemiBold"
+                                      ToolTip="When enabled, shows only quests that are currently active for your character on the current map." />
+                            <TextBlock Text="{Binding ActiveOnlyStatusText}" 
+                                       Margin="12,0" Foreground="#80C0FF" FontSize="11" FontStyle="Italic" VerticalAlignment="Center" />
+                        </WrapPanel>
+                        
+                        <!-- Second row: Additional filters -->
+                        <WrapPanel Margin="0,2,0,0">
+                            <CheckBox Content="Kappa Only"
+                                      IsChecked="{Binding KappaOnly, Mode=TwoWay}"
+                                      Margin="0,0,16,0"
+                                      ToolTip="Show only quests required for Kappa container." />
+                            <CheckBox Content="Lightkeeper Only"
+                                      IsChecked="{Binding LightkeeperOnly, Mode=TwoWay}"
+                                      Margin="0,0,16,0"
+                                      ToolTip="Show only Lightkeeper quests." />
+                            <TextBlock Text="Map:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <ComboBox ItemsSource="{Binding MapFilterOptions}"
+                                      SelectedItem="{Binding SelectedMapFilter, Mode=TwoWay}"
+                                      IsEnabled="{Binding IsMapFilterEnabled}"
+                                      Width="120"
+                                      Background="#2D2D2D"
+                                      ToolTip="Filter quests by map." />
+                        </WrapPanel>
                     </StackPanel>
-                </StackPanel>
 
-                <!-- Search Box - Docked at top -->
-                <TextBox DockPanel.Dock="Top" Margin="0,0,0,8"
-                         Text="{Binding SearchFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                         Padding="4" Background="#2D2D2D" Foreground="White" BorderBrush="#3E3E3E" />
+                    <!-- Search Box -->
+                    <TextBox Margin="0,0,0,6"
+                             Text="{Binding SearchFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             Padding="4" Background="#2D2D2D" Foreground="White" BorderBrush="#3E3E3E" />
 
-                <!-- Buttons and Stats - Docked at top -->
-                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
-                    <Button Content="{Binding SelectAllButtonText}" Click="SelectAllButton_Click" MinWidth="100" Padding="8,4" />
-                    <Button Content="Refresh" Click="RefreshButton_Click" MinWidth="80" Padding="8,4" Margin="8,0,0,0" />
-                    <TextBlock VerticalAlignment="Center" Margin="12,0,0,0" Foreground="Gray" FontSize="11">
-                        <Run Text="{Binding TrackedQuestCount, Mode=OneWay}" /><Run Text="/" /><Run Text="{Binding TotalQuestCount, Mode=OneWay}" />
-                        <Run Text=" tracked | " /><Run Text="{Binding VisibleQuestCount, Mode=OneWay}" Foreground="#80C0FF" /><Run Text=" visible" />
-                    </TextBlock>
-                </StackPanel>
+                    <!-- Buttons and Stats -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <Button Content="{Binding SelectAllButtonText}" Click="SelectAllButton_Click" MinWidth="100" Padding="8,4" />
+                        <Button Content="Refresh" Click="RefreshButton_Click" MinWidth="80" Padding="8,4" Margin="8,0,0,0" />
+                        <TextBlock VerticalAlignment="Center" Margin="12,0,0,0" Foreground="Gray" FontSize="11">
+                            <Run Text="{Binding TrackedQuestCount, Mode=OneWay}" /><Run Text="/" /><Run Text="{Binding TotalQuestCount, Mode=OneWay}" />
+                            <Run Text=" tracked | " /><Run Text="{Binding VisibleQuestCount, Mode=OneWay}" Foreground="#80C0FF" /><Run Text=" visible" />
+                        </TextBlock>
+                    </StackPanel>
 
-                <!-- Status Info - Docked at bottom -->
-                <TextBlock DockPanel.Dock="Bottom" Text="{Binding ActiveQuestsInfo}" TextWrapping="Wrap"
-                           FontFamily="Consolas" FontSize="10" Foreground="LightGray" Margin="0,8,0,0" />
+                    <!-- ============================================= -->
+                    <!-- QUEST LIST - Fixed minimum height -->
+                    <!-- ============================================= -->
+                    <Border Background="#1E1E1E" BorderBrush="#3E3E3E" BorderThickness="1" CornerRadius="4"
+                            MinHeight="250" MaxHeight="600">
+                        <ListBox ItemsSource="{Binding FilteredQuests}"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 ScrollViewer.CanContentScroll="False"
+                                 VirtualizingPanel.IsVirtualizing="False"
+                                 VirtualizingPanel.VirtualizationMode="Standard"
+                                 HorizontalContentAlignment="Stretch">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Setter Property="Padding" Value="0" />
+                                    <Setter Property="Margin" Value="2" />
+                                    <Setter Property="Background" Value="Transparent" />
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <ContentPresenter />
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="#252525" BorderBrush="#3E3E3E" 
+                                            BorderThickness="1" CornerRadius="4" Padding="8">
+                                        <StackPanel>
+                                            <!-- Quest Header Row -->
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
 
-                <!-- ============================================= -->
-                <!-- QUEST LIST - Fills remaining space -->
-                <!-- ============================================= -->
-                <Border Background="#1E1E1E" BorderBrush="#3E3E3E" BorderThickness="1" CornerRadius="4">
-                    <ListBox ItemsSource="{Binding FilteredQuests}"
-                             Background="Transparent"
-                             BorderThickness="0"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                             ScrollViewer.VerticalScrollBarVisibility="Auto"
-                             ScrollViewer.CanContentScroll="False"
-                             VirtualizingPanel.IsVirtualizing="False"
-                             VirtualizingPanel.VirtualizationMode="Standard"
-                             HorizontalContentAlignment="Stretch">
-                        <ListBox.ItemContainerStyle>
-                            <Style TargetType="ListBoxItem">
-                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                <Setter Property="Padding" Value="0" />
-                                <Setter Property="Margin" Value="2" />
-                                <Setter Property="Background" Value="Transparent" />
-                                <Setter Property="Template">
-                                    <Setter.Value>
-                                        <ControlTemplate TargetType="ListBoxItem">
-                                            <ContentPresenter />
-                                        </ControlTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                            </Style>
-                        </ListBox.ItemContainerStyle>
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Border Background="#252525" BorderBrush="#3E3E3E" 
-                                        BorderThickness="1" CornerRadius="4" Padding="8">
-                                    <StackPanel>
-                                        <!-- Quest Header Row -->
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto" />
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
+                                                <!-- Tracking Checkbox -->
+                                                <CheckBox Grid.Column="0" 
+                                                          IsChecked="{Binding IsTracked, Mode=TwoWay}"
+                                                          VerticalAlignment="Center" Margin="0,0,10,0" />
 
-                                            <!-- Tracking Checkbox -->
-                                            <CheckBox Grid.Column="0" 
-                                                      IsChecked="{Binding IsTracked, Mode=TwoWay}"
-                                                      VerticalAlignment="Center" Margin="0,0,10,0" />
-
-                                            <!-- Quest Info -->
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <TextBlock Text="{Binding TraderName}" Foreground="#FFD700" FontWeight="Bold" FontSize="10" />
-                                                    <TextBlock Text=" - " Foreground="Gray" FontSize="10" />
-                                                    <TextBlock Text="{Binding QuestName}" FontWeight="SemiBold" FontSize="12" />
+                                                <!-- Quest Info -->
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding TraderName}" Foreground="#FFD700" FontWeight="Bold" FontSize="10" />
+                                                        <TextBlock Text=" - " Foreground="Gray" FontSize="10" />
+                                                        <TextBlock Text="{Binding QuestName}" FontWeight="SemiBold" FontSize="12" />
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding RequirementsInfo}" Foreground="Gray" FontSize="10" />
                                                 </StackPanel>
-                                                <TextBlock Text="{Binding RequirementsInfo}" Foreground="Gray" FontSize="10" />
-                                            </StackPanel>
 
-                                            <!-- Status + Expand Button -->
-                                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                                <Border Background="{Binding StatusColor}" CornerRadius="3" Padding="6,2" Margin="0,0,8,0"
-                                                        Visibility="{Binding IsActive, Converter={StaticResource BoolToVis}}">
-                                                    <TextBlock Text="ACTIVE" FontSize="9" FontWeight="Bold" Foreground="White" />
-                                                </Border>
-                                                <Button Content="{Binding ExpandButtonText}" 
-                                                        Click="ExpandButton_Click" 
-                                                        Tag="{Binding}"
-                                                        Width="24" Height="24" Padding="0" FontSize="10" />
-                                            </StackPanel>
-                                        </Grid>
+                                                <!-- Status + Expand Button -->
+                                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Border Background="{Binding StatusColor}" CornerRadius="3" Padding="6,2" Margin="0,0,8,0"
+                                                            Visibility="{Binding IsActive, Converter={StaticResource BoolToVis}}">
+                                                        <TextBlock Text="ACTIVE" FontSize="9" FontWeight="Bold" Foreground="White" />
+                                                    </Border>
+                                                    <Button Content="{Binding ExpandButtonText}" 
+                                                            Click="ExpandButton_Click" 
+                                                            Tag="{Binding}"
+                                                            Width="24" Height="24" Padding="0" FontSize="10" />
+                                                </StackPanel>
+                                            </Grid>
 
-                                        <!-- Objectives Panel (Expandable) -->
-                                        <Border Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}"
-                                                Background="#1A1A1A" BorderBrush="#3E3E3E" BorderThickness="1"
-                                                CornerRadius="4" Margin="0,8,0,0" Padding="10">
-                                            <StackPanel>
-                                                <TextBlock Text="{Binding ObjectivesHeaderText}" FontWeight="SemiBold" FontSize="11" 
-                                                           Foreground="#80C0FF" Margin="0,0,0,6" TextWrapping="Wrap" />
+                                            <!-- Objectives Panel (Expandable) -->
+                                            <Border Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}"
+                                                    Background="#1A1A1A" BorderBrush="#3E3E3E" BorderThickness="1"
+                                                    CornerRadius="4" Margin="0,8,0,0" Padding="10">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding ObjectivesHeaderText}" FontWeight="SemiBold" FontSize="11" 
+                                                               Foreground="#80C0FF" Margin="0,0,0,6" TextWrapping="Wrap" />
                                                 
-                                                <ItemsControl ItemsSource="{Binding Objectives}">
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate>
-                                                            <Border Margin="0,2" Padding="6,4" CornerRadius="3"
-                                                                    Background="{Binding BackgroundColor}">
-                                                                <Grid>
-                                                                    <Grid.ColumnDefinitions>
-                                                                        <ColumnDefinition Width="Auto" />
-                                                                        <ColumnDefinition Width="*" />
-                                                                        <ColumnDefinition Width="Auto" />
-                                                                    </Grid.ColumnDefinitions>
-                                                                    <TextBlock Grid.Column="0" Text="{Binding TypeIcon}" 
-                                                                               Foreground="#80C0FF" FontSize="9" FontWeight="Bold"
-                                                                               VerticalAlignment="Top" Margin="0,0,6,0" />
-                                                                    <StackPanel Grid.Column="1">
-                                                                        <TextBlock Text="{Binding Description}" 
-                                                                                   TextDecorations="{Binding TextDecoration}"
-                                                                                   Foreground="{Binding TextColor}" 
-                                                                                   FontSize="11" TextWrapping="Wrap" />
-                                                                        <TextBlock Text="{Binding AdditionalInfo}" 
-                                                                                   Visibility="{Binding HasAdditionalInfo, Converter={StaticResource BoolToVis}}"
-                                                                                   Foreground="#606060" FontSize="9" FontStyle="Italic" 
-                                                                                   Margin="0,2,0,0" />
-                                                                    </StackPanel>
-                                                                    <TextBlock Grid.Column="2" Text="{Binding ProgressText}"
-                                                                               Foreground="#80C0FF" FontWeight="Bold" FontSize="11"
-                                                                               VerticalAlignment="Center" Margin="8,0,0,0" />
-                                                                </Grid>
-                                                            </Border>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
+                                                    <ItemsControl ItemsSource="{Binding Objectives}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Border Margin="0,2" Padding="6,4" CornerRadius="3"
+                                                                        Background="{Binding BackgroundColor}">
+                                                                    <Grid>
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="Auto" />
+                                                                            <ColumnDefinition Width="*" />
+                                                                            <ColumnDefinition Width="Auto" />
+                                                                        </Grid.ColumnDefinitions>
+                                                                        <TextBlock Grid.Column="0" Text="{Binding TypeIcon}" 
+                                                                                   Foreground="#80C0FF" FontSize="9" FontWeight="Bold"
+                                                                                   VerticalAlignment="Top" Margin="0,0,6,0" />
+                                                                        <StackPanel Grid.Column="1">
+                                                                            <TextBlock Text="{Binding Description}" 
+                                                                                       TextDecorations="{Binding TextDecoration}"
+                                                                                       Foreground="{Binding TextColor}" 
+                                                                                       FontSize="11" TextWrapping="Wrap" />
+                                                                            <TextBlock Text="{Binding AdditionalInfo}" 
+                                                                                       Visibility="{Binding HasAdditionalInfo, Converter={StaticResource BoolToVis}}"
+                                                                                       Foreground="#606060" FontSize="9" FontStyle="Italic" 
+                                                                                       Margin="0,2,0,0" />
+                                                                        </StackPanel>
+                                                                        <TextBlock Grid.Column="2" Text="{Binding ProgressText}"
+                                                                                   Foreground="#80C0FF" FontWeight="Bold" FontSize="11"
+                                                                                   VerticalAlignment="Center" Margin="8,0,0,0" />
+                                                                    </Grid>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
 
-                                                <!-- No objectives message -->
-                                                <TextBlock Text="No objective data available" Foreground="Gray" FontSize="10" FontStyle="Italic"
-                                                           Visibility="{Binding HasNoObjectives, Converter={StaticResource BoolToVis}}" />
-                                            </StackPanel>
-                                        </Border>
-                                    </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                </Border>
-            </DockPanel>
-        </GroupBox>
-    </DockPanel>
+                                                    <!-- No objectives message -->
+                                                    <TextBlock Text="No objective data available" Foreground="Gray" FontSize="10" FontStyle="Italic"
+                                                               Visibility="{Binding HasNoObjectives, Converter={StaticResource BoolToVis}}" />
+                                                </StackPanel>
+                                            </Border>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Border>
+
+                    <!-- Status Info at bottom -->
+                    <TextBlock Text="{Binding ActiveQuestsInfo}" TextWrapping="Wrap"
+                               FontFamily="Consolas" FontSize="10" Foreground="LightGray" Margin="0,8,0,0" />
+                </StackPanel>
+            </GroupBox>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>

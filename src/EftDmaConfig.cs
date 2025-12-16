@@ -1377,6 +1377,12 @@ namespace LoneEftDmaRadar
         public bool Enabled { get; set; } = true;
 
         /// <summary>
+        /// True if quest zones should be shown on the radar.
+        /// </summary>
+        [JsonPropertyName("showZones")]
+        public bool ShowZones { get; set; } = true;
+
+        /// <summary>
         /// True if Active Only mode is enabled (filters to active quests for current map when in raid).
         /// </summary>
         [JsonPropertyName("activeOnly")]

@@ -539,8 +539,16 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Quests
             var itemIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var zoneIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+            // Get tracked quest IDs from config
+            var trackedQuestIds = App.Config.QuestHelper.TrackedQuests;
+
             foreach (var quest in ActiveQuests)
             {
+                // Only process quests that are tracked (or all quests if no quests are tracked)
+                bool isTracked = trackedQuestIds.Count == 0 || trackedQuestIds.Contains(quest.Id);
+                if (!isTracked)
+                    continue;
+
                 foreach (var itemId in quest.RequiredItemIds)
                 {
                     itemIds.Add(itemId);
@@ -554,10 +562,10 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Quests
             ActiveQuestItemIds = itemIds;
             ActiveQuestZoneIds = zoneIds;
 
-            // Update zone active status based on active quests
+            // Update zone active status based on active AND tracked quests
             foreach (var zone in _zones.Values)
             {
-                // Zone is active if it's in the required zones or if we can match it to an active quest
+                // Zone is active if it's in the required zones for active+tracked quests
                 bool isActive = zoneIds.Contains(zone.Id);
                 
                 // Also check the QuestDatabase for zone-to-quest mapping
@@ -568,8 +576,15 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Quests
                     {
                         if (_quests.TryGetValue(questInfo.Id, out var quest) && quest.IsActive)
                         {
-                            isActive = true;
-                            break;
+                            // Check if this quest is tracked
+                            bool questIsTracked = trackedQuestIds.Count == 0 || trackedQuestIds.Contains(questInfo.Id);
+                            if (questIsTracked)
+                            {
+                                isActive = true;
+                                zone.QuestName = questInfo.Name; // Set quest name for display
+                                zone.QuestId = questInfo.Id;
+                                break;
+                            }
                         }
                     }
                 }

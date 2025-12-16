@@ -192,7 +192,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
                 {
                     return new CorpseImportantItem
                     {
-                        Label = $"? {item.ShortName}",
+                        Label = $"!!! {item.ShortName}",
                         Type = CorpseImportantItemType.ImportantFilter,
                         CustomFilterColor = item.CustomFilter?.Color
                     };
@@ -235,7 +235,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
                 {
                     yield return new CorpseImportantItem
                     {
-                        Label = $"? {item.ShortName}",
+                        Label = $"!!! {item.ShortName}",
                         Type = CorpseImportantItemType.ImportantFilter,
                         CustomFilterColor = item.CustomFilter?.Color
                     };

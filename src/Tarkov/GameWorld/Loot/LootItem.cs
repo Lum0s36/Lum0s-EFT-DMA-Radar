@@ -305,9 +305,9 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
         public string GetUILabel()
         {
             var label = "";
-            // "!!" only for Wishlist items, not all Important items
+            // "!!" for Wishlist items
             if (IsWishlisted)
-                label += "!!";
+                label += "!! ";
             else if (Price > 0)
                 label += $"[{Utilities.FormatNumberKM(Price)}] ";
             label += ShortName;

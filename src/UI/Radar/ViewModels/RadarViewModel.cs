@@ -522,7 +522,7 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                     localPlayer.Draw(canvas, mapParams, localPlayer);
 
                     // Draw active quest zones (if enabled)
-                    if (App.Config.QuestHelper.Enabled)
+                    if (App.Config.QuestHelper.Enabled && App.Config.QuestHelper.ShowZones)
                     {
                         var questManager = Memory.Game?.QuestManager;
                         if (questManager != null)
