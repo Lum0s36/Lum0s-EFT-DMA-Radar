@@ -1,128 +1,415 @@
 /*
- * Quest Helper - Quest Manager
- * Based on analysis of eft-dma-radar_newUI_archive
- * Adapted for IL2CPP
+ * Lone EFT DMA Radar
+ * Brought to you by Lone (Lone DMA)
  * 
- * Reads player's active quests and quest zones from game memory.
- */
+MIT License
 
-using System.Collections.Concurrent;
-using LoneEftDmaRadar.Tarkov.Unity;
+Copyright (c) 2025 Lone DMA
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+ *
+*/
+
+using Collections.Pooled;
 using LoneEftDmaRadar.Tarkov.Unity.Collections;
 using LoneEftDmaRadar.Tarkov.Unity.Structures;
 using LoneEftDmaRadar.UI.Misc;
+using System.Collections.Frozen;
+using System.Diagnostics;
 using SDK;
 
 namespace LoneEftDmaRadar.Tarkov.GameWorld.Quests
 {
-    /// <summary>
-    /// Manages quest data including active quests and quest zones.
-    /// </summary>
     public sealed class QuestManager
     {
-        #region Fields/Properties
-
-        private readonly ulong _localGameWorld;
-        private readonly ConcurrentDictionary<string, QuestData> _quests = new(StringComparer.OrdinalIgnoreCase);
-        private readonly ConcurrentDictionary<string, QuestZone> _zones = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Lock _syncLock = new();
-        private DateTime _lastZoneScan = DateTime.MinValue;
-        private static readonly TimeSpan ZoneScanInterval = TimeSpan.FromSeconds(10);
-
+        private readonly ulong _profile;
+        private DateTime _lastRefresh = DateTime.MinValue;
+        private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(1);
+        
         /// <summary>
-        /// All player quests (keyed by quest ID).
+        /// Cached condition counters from Profile.TaskConditionCounters
+        /// Key: MongoID string, Value: current count
         /// </summary>
-        public IReadOnlyDictionary<string, QuestData> Quests => _quests;
+        private readonly ConcurrentDictionary<string, int> _conditionCounters = new(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>
-        /// All quest zones found in the world.
-        /// </summary>
-        public IReadOnlyDictionary<string, QuestZone> Zones => _zones;
-
-        /// <summary>
-        /// Active quests (Started or AvailableForFinish).
-        /// </summary>
-        public IEnumerable<QuestData> ActiveQuests => _quests.Values.Where(q => q.IsActive);
-
-        /// <summary>
-        /// Active zones (zones linked to active quests).
-        /// </summary>
-        public IEnumerable<QuestZone> ActiveZones => _zones.Values.Where(z => z.IsActive);
-
-        /// <summary>
-        /// All item IDs required for active quests.
-        /// </summary>
-        public IReadOnlySet<string> ActiveQuestItemIds { get; private set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        /// <summary>
-        /// All zone IDs required for active quests.
-        /// </summary>
-        public IReadOnlySet<string> ActiveQuestZoneIds { get; private set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        #endregion
-
-        #region Constructor
-
-        public QuestManager(ulong localGameWorld)
+        public QuestManager(ulong profile)
         {
-            _localGameWorld = localGameWorld;
-            
-            // Pre-populate zones from QuestDatabase if available
-            if (QuestDatabase.IsInitialized)
+            _profile = profile;
+        }
+
+        private readonly ConcurrentDictionary<string, QuestEntry> _quests = new(StringComparer.OrdinalIgnoreCase);
+        /// <summary>
+        /// All current quests.
+        /// </summary>
+        public IReadOnlyDictionary<string, QuestEntry> Quests => _quests;
+
+        private readonly ConcurrentDictionary<string, byte> _items = new(StringComparer.OrdinalIgnoreCase);
+        /// <summary>
+        /// All item BSG ID's that we need to pickup.
+        /// </summary>
+        public IReadOnlyDictionary<string, byte> ItemConditions => _items;
+
+        private readonly ConcurrentDictionary<string, QuestLocation> _locations = new(StringComparer.OrdinalIgnoreCase);
+        /// <summary>
+        /// All locations that we need to visit.
+        /// </summary>
+        public IReadOnlyDictionary<string, QuestLocation> LocationConditions => _locations;
+
+        /// <summary>
+        /// Map Identifier of Current Map.
+        /// </summary>
+        private static string MapID
+        {
+            get
             {
-                var mapId = Memory.MapID;
-                if (!string.IsNullOrEmpty(mapId))
-                {
-                    foreach (var zoneInfo in QuestDatabase.GetZonesForMap(mapId))
-                    {
-                        if (zoneInfo.Position != Vector3.Zero)
-                        {
-                            var zone = new QuestZone(0, zoneInfo.Id, zoneInfo.Position, QuestZoneType.Generic)
-                            {
-                                Name = zoneInfo.Description ?? zoneInfo.Id,
-                                IsActive = false // Will be updated when quests are refreshed
-                            };
-                            _zones[zoneInfo.Id] = zone;
-                        }
-                    }
-                    DebugLogger.LogDebug($"[QuestManager] Pre-loaded {_zones.Count} zones for map {mapId}");
-                }
+                var id = Memory.MapID;
+                id ??= "MAPDEFAULT";
+                return id;
             }
         }
 
-        #endregion
-
-        #region Public Methods
-
-        /// <summary>
-        /// Refresh quest data from memory. Call from slow worker thread.
-        /// </summary>
-        public void Refresh(ulong profilePtr, CancellationToken ct)
+        public void Refresh(CancellationToken ct)
         {
-            if (!App.Config.QuestHelper.Enabled)
-                return;
-
             try
             {
-                ct.ThrowIfCancellationRequested();
-                RefreshPlayerQuests(profilePtr, ct);
-                
-                // Only scan for zones periodically (they don't change often)
-                if (DateTime.UtcNow - _lastZoneScan > ZoneScanInterval)
+                // Rate limiting
+                if (DateTime.UtcNow - _lastRefresh < RefreshInterval)
+                    return;
+                _lastRefresh = DateTime.UtcNow;
+
+                using var masterQuests = new PooledSet<string>(StringComparer.OrdinalIgnoreCase);
+                using var masterItems = new PooledSet<string>(StringComparer.OrdinalIgnoreCase);
+                using var masterLocations = new PooledSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                // Read condition counters from Profile.TaskConditionCounters (Dictionary<MongoID, TaskConditionCounter>)
+                ReadConditionCountersFromProfile();
+
+                var questsData = Memory.ReadPtr(_profile + Offsets.Profile.QuestsData);
+                using var questsDataList = UnityList<ulong>.Create(questsData, false);
+
+                foreach (var qDataEntry in questsDataList)
                 {
-                    RefreshQuestZones(ct);
-                    _lastZoneScan = DateTime.UtcNow;
+                    ct.ThrowIfCancellationRequested();
+                    try
+                    {
+                        // qDataEntry should be public class QuestStatusData : Object
+                        var qStatus = Memory.ReadValue<int>(qDataEntry + Offsets.QuestStatusData.Status);
+                        if (qStatus != 2) // started
+                            continue;
+
+                        var qIdPtr = Memory.ReadPtr(qDataEntry + Offsets.QuestStatusData.Id);
+                        var qId = Memory.ReadUnicodeString(qIdPtr, 64, false);
+
+                        // qID should be Task ID
+                        if (string.IsNullOrEmpty(qId) || !TarkovDataManager.TaskData.TryGetValue(qId, out var task))
+                            continue;
+
+                        masterQuests.Add(qId);
+                        var questEntry = _quests.GetOrAdd(qId, id => new QuestEntry(id));
+
+                        // Read completed conditions from QuestStatusData.CompletedConditions HashSet
+                        var completedConditionsPtr = Memory.ReadPtr(qDataEntry + Offsets.QuestStatusData.CompletedConditions);
+                        using var completedConditions = new PooledList<string>();
+
+                        if (completedConditionsPtr != 0)
+                        {
+                            try
+                            {
+                                using var completedHS = UnityHashSet<MongoID>.Create(completedConditionsPtr, true);
+                                foreach (var c in completedHS)
+                                {
+                                    var completedCond = c.Value.ReadString();
+                                    if (!string.IsNullOrEmpty(completedCond))
+                                    {
+                                        completedConditions.Add(completedCond);
+                                        DebugLogger.LogDebug($"[QuestManager] Quest {qId}: Completed condition {completedCond}");
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                DebugLogger.LogDebug($"[QuestManager] Error reading CompletedConditions for {qId}: {ex.Message}");
+                            }
+                        }
+                        
+                        // Update quest entry with completed conditions
+                        questEntry.UpdateCompletedConditions(completedConditions);
+                        
+                        // Update quest entry with condition counters from profile
+                        if (task.Objectives != null)
+                        {
+                            using var counters = new PooledList<KeyValuePair<string, int>>();
+                            foreach (var obj in task.Objectives)
+                            {
+                                if (!string.IsNullOrEmpty(obj.Id))
+                                {
+                                    // First check if we have a counter from profile
+                                    if (_conditionCounters.TryGetValue(obj.Id, out var count))
+                                    {
+                                        counters.Add(new KeyValuePair<string, int>(obj.Id, count));
+                                    }
+                                    // If objective is completed, set count to target
+                                    else if (completedConditions.Contains(obj.Id) && obj.Count > 0)
+                                    {
+                                        counters.Add(new KeyValuePair<string, int>(obj.Id, obj.Count));
+                                    }
+                                }
+                            }
+                            questEntry.UpdateConditionCounters(counters);
+                        }
+
+                        if (App.Config.QuestHelper.BlacklistedQuests.ContainsKey(qId))
+                            continue; // Log the quest but dont get any conditions
+
+                        // Convert to PooledSet for FilterConditions
+                        using var completedSet = new PooledSet<string>(StringComparer.OrdinalIgnoreCase);
+                        foreach (var c in completedConditions)
+                            completedSet.Add(c);
+
+                        FilterConditions(task, qId, completedSet, masterItems, masterLocations);
+                    }
+                    catch
+                    {
+                        // Skip invalid quest entries
+                    }
+                }
+
+                // Remove stale Quests/Items/Locations
+                foreach (var oldQuest in _quests)
+                {
+                    if (!masterQuests.Contains(oldQuest.Key))
+                        _quests.TryRemove(oldQuest.Key, out _);
+                }
+                foreach (var oldItem in _items)
+                {
+                    if (!masterItems.Contains(oldItem.Key))
+                        _items.TryRemove(oldItem.Key, out _);
+                }
+                foreach (var oldLoc in _locations.Keys)
+                {
+                    if (!masterLocations.Contains(oldLoc))
+                        _locations.TryRemove(oldLoc, out _);
+                }
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                DebugLogger.LogDebug($"[QuestManager] CRITICAL ERROR: {ex}");
+            }
+        }
+        
+        /// <summary>
+        /// Read TaskConditionCounters from Profile.
+        /// Profile.TaskConditionCounters is Dictionary<MongoID, TaskConditionCounter> at offset 0x90
+        /// </summary>
+        private void ReadConditionCountersFromProfile()
+        {
+            try
+            {
+                var countersPtr = Memory.ReadPtr(_profile + Offsets.Profile.TaskConditionCounters);
+                if (countersPtr == 0)
+                {
+                    DebugLogger.LogDebug("[QuestManager] TaskConditionCounters pointer is null");
+                    return;
+                }
+
+                // Unity/Mono Dictionary<TKey, TValue> layout:
+                // +0x10 = buckets array
+                // +0x18 = entries array  
+                // +0x20 = count (but we need freeCount subtracted)
+                // +0x28 = freeList
+                // +0x2C = freeCount
+                // +0x30 = version
+                // Actual count = entries count from array
+                
+                var entriesPtr = Memory.ReadPtr(countersPtr + 0x18);
+                if (entriesPtr == 0)
+                {
+                    DebugLogger.LogDebug("[QuestManager] Entries pointer is null");
+                    return;
                 }
                 
-                UpdateActiveItems();
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
+                // Read array length from entries array header (+0x18 in managed array)
+                var arrayLength = Memory.ReadValue<int>(entriesPtr + 0x18);
+                
+                if (arrayLength <= 0 || arrayLength > 500)
+                {
+                    DebugLogger.LogDebug($"[QuestManager] Invalid array length: {arrayLength}");
+                    return;
+                }
+                
+                _conditionCounters.Clear();
+                int foundCounters = 0;
+                
+                // Dictionary entry structure for Dictionary<MongoID, TaskConditionCounter>:
+                // struct Entry {
+                //     int hashCode;      // +0x00 (4 bytes)
+                //     int next;          // +0x04 (4 bytes)
+                //     MongoID key;       // +0x08 (0x18 bytes = 24 bytes)
+                //     TaskConditionCounter value; // +0x20 (8 bytes pointer)
+                // }
+                // Total entry size = 0x28 (40 bytes)
+                
+                const int entrySize = 0x28;
+                const int hashCodeOffset = 0x00;
+                const int keyOffset = 0x08;
+                const int valueOffset = 0x20;
+                
+                // Entries array starts at +0x20 (after array header)
+                var entriesStart = entriesPtr + 0x20;
+                
+                for (int i = 0; i < arrayLength && i < 300; i++)
+                {
+                    try
+                    {
+                        var entryAddr = entriesStart + (uint)(i * entrySize);
+                        
+                        // Check if entry is valid (hashCode >= 0 means it's used)
+                        var hashCode = Memory.ReadValue<int>(entryAddr + hashCodeOffset);
+                        if (hashCode < 0)
+                            continue; // Empty slot
+                        
+                        // Read MongoID key
+                        var mongoId = Memory.ReadValue<MongoID>(entryAddr + keyOffset);
+                        var conditionId = mongoId.ReadString();
+                        
+                        if (string.IsNullOrEmpty(conditionId))
+                            continue;
+                        
+                        // Read TaskConditionCounter pointer
+                        var counterPtr = Memory.ReadPtr(entryAddr + valueOffset);
+                        if (counterPtr == 0)
+                            continue;
+                        
+                        // Read Value (int at offset 0x40 in TaskConditionCounter)
+                        var value = Memory.ReadValue<int>(counterPtr + Offsets.TaskConditionCounter.Value);
+                        
+                        if (value >= 0 && value < 10000) // Sanity check
+                        {
+                            _conditionCounters[conditionId] = value;
+                            foundCounters++;
+                        }
+                    }
+                    catch
+                    {
+                        // Skip invalid entries
+                    }
+                }
+                
+                if (foundCounters > 0)
+                {
+                    DebugLogger.LogDebug($"[QuestManager] Found {foundCounters} condition counters");
+                }
             }
             catch (Exception ex)
             {
-                DebugLogger.LogDebug($"[QuestManager] Refresh error: {ex}");
+                DebugLogger.LogDebug($"[QuestManager] Error reading condition counters: {ex.Message}");
+            }
+        }
+
+        private static readonly FrozenSet<QuestObjectiveType> _skipObjectiveTypes = new HashSet<QuestObjectiveType>
+        {
+            QuestObjectiveType.BuildWeapon,
+            QuestObjectiveType.GiveQuestItem,
+            QuestObjectiveType.Extract,
+            QuestObjectiveType.Shoot,
+            QuestObjectiveType.TraderLevel,
+            QuestObjectiveType.GiveItem
+        }.ToFrozenSet();
+
+        private void FilterConditions(
+            TarkovDataManager.TaskElement task,
+            string questId,
+            PooledSet<string> completedConditions,
+            PooledSet<string> masterItems,
+            PooledSet<string> masterLocations)
+        {
+            if (task?.Objectives is null)
+                return;
+
+            foreach (var objective in task.Objectives)
+            {
+                try
+                {
+                    if (objective is null)
+                        continue;
+
+                    // Skip objectives that are already completed (by condition id)
+                    if (!string.IsNullOrEmpty(objective.Id) && completedConditions.Contains(objective.Id))
+                        continue;
+
+                    if (_skipObjectiveTypes.Contains(objective.Type))
+                        continue;
+
+                    // Item Pickup Objectives - Track item IDs for highlighting in LootManager
+                    // Note: For FindQuestItem, we do NOT create zone markers here.
+                    // Quest items (like Bronze Pocket Watch) are tracked by LootManager via
+                    // the ItemTemplate.QuestItem flag and their real in-raid position.
+                    if (objective.Type == QuestObjectiveType.FindQuestItem)
+                    {
+                        if (objective.QuestItem?.Id is not null)
+                        {
+                            masterItems.Add(objective.QuestItem.Id);
+                            _ = _items.GetOrAdd(objective.QuestItem.Id, 0);
+                        }
+                        // Skip adding zone markers - quest items have live positions from LootManager
+                        continue;
+                    }
+                    else if (objective.Type == QuestObjectiveType.FindItem)
+                    {
+                        if (objective.Item?.Id is not null)
+                        {
+                            masterItems.Add(objective.Item.Id);
+                            _ = _items.GetOrAdd(objective.Item.Id, 0);
+                        }
+                        // For regular items, still check for zones (some quests have specific pickup locations)
+                    }
+                    
+                    // Location Visit Objectives: visit, mark, plantItem, plantQuestItem
+                    // These objectives have fixed zone locations that make sense to show
+                    if (objective.Type == QuestObjectiveType.Visit
+                        || objective.Type == QuestObjectiveType.Mark
+                        || objective.Type == QuestObjectiveType.PlantItem
+                        || objective.Type == QuestObjectiveType.PlantQuestItem)
+                    {
+                        if (objective.Zones is not null && objective.Zones.Count > 0)
+                        {
+                            if (TarkovDataManager.TaskZones.TryGetValue(MapID, out var zonesForMap))
+                            {
+                                foreach (var zone in objective.Zones)
+                                {
+                                    if (zone?.Id is string zoneId && zonesForMap.TryGetValue(zoneId, out var pos))
+                                    {
+                                        // Make a stable key for this quest-objective-zone triple
+                                        var locKey = $"{questId}:{objective.Id}:{zoneId}";
+                                        _locations.GetOrAdd(locKey, _ => new QuestLocation(questId, objective.Id, pos));
+                                        masterLocations.Add(locKey);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                    // Skip invalid objectives
+                }
             }
         }
 
@@ -133,466 +420,25 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Quests
         {
             if (string.IsNullOrEmpty(itemId))
                 return false;
-
-            return ActiveQuestItemIds.Contains(itemId);
+            return _items.ContainsKey(itemId);
         }
-
+        
         /// <summary>
-        /// Check if a zone ID is required for an active quest.
+        /// Get objective progress for a specific quest and objective.
         /// </summary>
-        public bool IsActiveZone(string zoneId)
+        public (bool isCompleted, int currentCount) GetObjectiveProgress(string questId, string objectiveId)
         {
-            if (string.IsNullOrEmpty(zoneId))
-                return false;
-
-            return ActiveQuestZoneIds.Contains(zoneId);
-        }
-
-        #endregion
-
-        #region Private Methods
-
-        /// <summary>
-        /// Read player's quests from Profile.QuestsData.
-        /// </summary>
-        private void RefreshPlayerQuests(ulong profilePtr, CancellationToken ct)
-        {
-            if (profilePtr == 0)
-            {
-                DebugLogger.LogDebug("[QuestManager] Profile pointer is 0, skipping quest refresh");
-                return;
-            }
-
-            try
-            {
-                // Profile.QuestsData is a List<QuestStatusData>
-                var questsDataPtr = Memory.ReadPtr(profilePtr + Offsets.Profile.QuestsData);
-                if (questsDataPtr == 0)
-                {
-                    DebugLogger.LogDebug("[QuestManager] QuestsData pointer is 0");
-                    return;
-                }
-
-                // Read the list
-                using var questsList = UnityList<ulong>.Create(addr: questsDataPtr, useCache: false); // Don't cache for fresh data
+            if (string.IsNullOrEmpty(questId) || string.IsNullOrEmpty(objectiveId))
+                return (false, 0);
                 
-                int processedCount = 0;
-                int activeCount = 0;
-
-                foreach (var questDataAddr in questsList)
-                {
-                    ct.ThrowIfCancellationRequested();
-
-                    if (questDataAddr == 0)
-                        continue;
-
-                    try
-                    {
-                        // Read status first - only process Started quests (status == 2)
-                        var statusInt = Memory.ReadValue<int>(questDataAddr + Offsets.QuestStatusData.Status);
-                        var status = (EQuestStatus)statusInt;
-                        
-                        // Only process Started or AvailableForFinish quests
-                        if (status != EQuestStatus.Started && status != EQuestStatus.AvailableForFinish)
-                            continue;
-
-                        // Read quest ID
-                        var idPtr = Memory.ReadPtr(questDataAddr + Offsets.QuestStatusData.Id);
-                        if (idPtr == 0)
-                            continue;
-
-                        var questId = Memory.ReadUnicodeString(idPtr, 64, false);
-                        if (string.IsNullOrEmpty(questId))
-                            continue;
-
-                        processedCount++;
-
-                        // Get or create quest data
-                        if (!_quests.TryGetValue(questId, out var quest))
-                        {
-                            quest = new QuestData(questDataAddr, questId);
-                            
-                            // Try to get quest info from database
-                            if (QuestDatabase.IsInitialized && QuestDatabase.AllQuests.TryGetValue(questId, out var questInfo))
-                            {
-                                quest.Name = questInfo.Name;
-                                quest.RequiredItemIds.AddRange(questInfo.RequiredItemIds);
-                                quest.RequiredZoneIds.AddRange(questInfo.RequiredZoneIds);
-                            }
-                            
-                            _quests[questId] = quest;
-                        }
-
-                        quest.Status = status;
-                        quest.StartTime = Memory.ReadValue<int>(questDataAddr + Offsets.QuestStatusData.StartTime);
-                        quest.AvailableAfter = Memory.ReadValue<int>(questDataAddr + Offsets.QuestStatusData.AvailableAfter);
-
-                        if (quest.IsActive)
-                            activeCount++;
-
-                        // Read CompletedConditions (HashSet<MongoID>)
-                        ReadCompletedConditions(questDataAddr, quest);
-                    }
-                    catch (Exception ex)
-                    {
-                        // Skip invalid quest data
-                        DebugLogger.LogDebug($"[QuestManager] Error reading quest at 0x{questDataAddr:X}: {ex.Message}");
-                    }
-                }
-                
-                if (processedCount > 0 || activeCount > 0)
-                {
-                    DebugLogger.LogDebug($"[QuestManager] Processed {processedCount} quests, {activeCount} active");
-                }
-            }
-            catch (Exception ex)
+            if (_quests.TryGetValue(questId, out var quest))
             {
-                DebugLogger.LogDebug($"[QuestManager] RefreshPlayerQuests error: {ex}");
+                var isCompleted = quest.IsObjectiveCompleted(objectiveId);
+                var currentCount = quest.GetObjectiveProgress(objectiveId);
+                return (isCompleted, currentCount);
             }
+            
+            return (false, 0);
         }
-
-        /// <summary>
-        /// Read CompletedConditions HashSet from QuestStatusData.
-        /// </summary>
-        private static void ReadCompletedConditions(ulong questDataAddr, QuestData quest)
-        {
-            try
-            {
-                var completedConditionsPtr = Memory.ReadPtr(questDataAddr + Offsets.QuestStatusData.CompletedConditions);
-                if (completedConditionsPtr == 0)
-                {
-                    return;
-                }
-
-                // Read count first to check if there are any completed conditions
-                var count = Memory.ReadValue<int>(completedConditionsPtr + UnityHashSet<MongoID>.CountOffset, false);
-                if (count <= 0)
-                {
-                    return;
-                }
-                
-                DebugLogger.LogDebug($"[QuestManager] Quest {quest.Id}: Found {count} completed conditions in HashSet");
-
-                // Clear existing and re-read
-                quest.CompletedConditions.Clear();
-
-                using var completedHashSet = UnityHashSet<MongoID>.Create(completedConditionsPtr, false); // Don't cache for fresh data
-                int conditionCount = 0;
-                foreach (var entry in completedHashSet)
-                {
-                    try
-                    {
-                        var conditionId = entry.Value.ReadString(64, false); // Don't cache
-                        if (!string.IsNullOrEmpty(conditionId))
-                        {
-                            quest.CompletedConditions.Add(conditionId);
-                            conditionCount++;
-                            DebugLogger.LogDebug($"[QuestManager] Quest {quest.Id}: Completed condition: {conditionId}");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        DebugLogger.LogDebug($"[QuestManager] Error reading condition entry: {ex.Message}");
-                    }
-                }
-                
-                if (conditionCount > 0)
-                {
-                    DebugLogger.LogDebug($"[QuestManager] Quest {quest.Id}: Successfully read {conditionCount} completed conditions");
-                }
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.LogDebug($"[QuestManager] ReadCompletedConditions error for quest {quest.Id}: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Scan for quest zones in the game world (TriggerWithId objects).
-        /// This scans both the loot list and synchronizable objects.
-        /// </summary>
-        private void RefreshQuestZones(CancellationToken ct)
-        {
-            try
-            {
-                // Scan loot list for PlaceItemTrigger and QuestTrigger objects
-                ScanLootListForZones(ct);
-                
-                // Also scan synchronizable objects for triggers
-                ScanSynchronizableObjectsForZones(ct);
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.LogDebug($"[QuestManager] RefreshQuestZones error: {ex}");
-            }
-        }
-
-        /// <summary>
-        /// Scan the loot list for quest zone triggers.
-        /// </summary>
-        private void ScanLootListForZones(CancellationToken ct)
-        {
-            try
-            {
-                var lootListAddr = Memory.ReadPtr(_localGameWorld + Offsets.GameWorld.LootList);
-                if (lootListAddr == 0)
-                    return;
-
-                using var lootList = UnityList<ulong>.Create(addr: lootListAddr, useCache: true);
-
-                foreach (var objectAddr in lootList)
-                {
-                    ct.ThrowIfCancellationRequested();
-
-                    if (objectAddr == 0)
-                        continue;
-
-                    try
-                    {
-                        ProcessPotentialQuestZone(objectAddr);
-                    }
-                    catch
-                    {
-                        // Skip invalid objects
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.LogDebug($"[QuestManager] ScanLootListForZones error: {ex}");
-            }
-        }
-
-        /// <summary>
-        /// Scan synchronizable objects for quest zone triggers.
-        /// </summary>
-        private void ScanSynchronizableObjectsForZones(CancellationToken ct)
-        {
-            try
-            {
-                var syncLogicProcessor = Memory.ReadPtr(_localGameWorld + Offsets.GameWorld.SynchronizableObjectLogicProcessor);
-                if (syncLogicProcessor == 0)
-                    return;
-
-                var syncObjectsListAddr = Memory.ReadPtr(syncLogicProcessor + Offsets.SynchronizableObjectLogicProcessor._staticSynchronizableObjects);
-                if (syncObjectsListAddr == 0)
-                    return;
-
-                using var syncObjectsList = UnityList<ulong>.Create(addr: syncObjectsListAddr, useCache: true);
-
-                foreach (var objectAddr in syncObjectsList)
-                {
-                    ct.ThrowIfCancellationRequested();
-
-                    if (objectAddr == 0)
-                        continue;
-
-                    try
-                    {
-                        ProcessPotentialQuestZone(objectAddr);
-                    }
-                    catch
-                    {
-                        // Skip invalid objects
-                    }
-                }
-            }
-            catch
-            {
-                // SynchronizableObjects may not exist on all maps
-            }
-        }
-
-        /// <summary>
-        /// Process a potential quest zone object.
-        /// </summary>
-        private void ProcessPotentialQuestZone(ulong objectAddr)
-        {
-            // Read the MonoBehaviour/component
-            var monoBehaviour = Memory.ReadPtr(objectAddr + ObjectClass.MonoBehaviourOffset);
-            if (monoBehaviour == 0)
-                return;
-
-            // Get class info to check if this is a quest trigger
-            var classPtr = Memory.ReadPtr(monoBehaviour + UnitySDK.UnityOffsets.Component_ObjectClassOffset);
-            if (classPtr == 0)
-                return;
-
-            var className = ObjectClass.ReadName(classPtr);
-            if (string.IsNullOrEmpty(className))
-                return;
-
-            // Determine zone type from class name
-            QuestZoneType? zoneType = null;
-            if (className.Contains("PlaceItemTrigger", StringComparison.OrdinalIgnoreCase))
-            {
-                zoneType = QuestZoneType.PlaceItem;
-            }
-            else if (className.Contains("QuestTrigger", StringComparison.OrdinalIgnoreCase) ||
-                     className.Contains("ExperienceTrigger", StringComparison.OrdinalIgnoreCase) ||
-                     className.Contains("ConditionZoneTrigger", StringComparison.OrdinalIgnoreCase))
-            {
-                zoneType = QuestZoneType.Visit;
-            }
-            else if (className.Contains("TriggerWithId", StringComparison.OrdinalIgnoreCase))
-            {
-                zoneType = QuestZoneType.Generic;
-            }
-
-            if (zoneType == null)
-                return;
-
-            // Read zone ID from TriggerWithId base
-            var idPtr = Memory.ReadPtr(monoBehaviour + Offsets.TriggerWithId.Id);
-            if (idPtr == 0)
-                return;
-
-            var zoneId = Memory.ReadUnicodeString(idPtr, 64, true);
-            if (string.IsNullOrEmpty(zoneId))
-                return;
-
-            // Get position from transform
-            var position = GetTransformPosition(monoBehaviour);
-            if (position == Vector3.Zero)
-                return;
-
-            // Check if we already have this zone
-            if (_zones.TryGetValue(zoneId, out var existingZone))
-            {
-                // Update position if we found it in memory (more accurate)
-                existingZone.UpdatePosition(position);
-                existingZone.Address = monoBehaviour;
-                return;
-            }
-
-            // Create new zone
-            var zone = new QuestZone(monoBehaviour, zoneId, position, zoneType.Value);
-
-            // Try to get description from database first
-            if (QuestDatabase.IsInitialized)
-            {
-                var zoneInfo = QuestDatabase.GetZoneInfo(zoneId);
-                if (zoneInfo != null && !string.IsNullOrEmpty(zoneInfo.Description))
-                {
-                    zone.Name = zoneInfo.Description;
-                }
-            }
-
-            // Try to read description from memory
-            if (string.IsNullOrEmpty(zone.Name) || zone.Name == zoneId)
-            {
-                try
-                {
-                    var descPtr = Memory.ReadPtr(monoBehaviour + Offsets.TriggerWithId.Description);
-                    if (descPtr != 0)
-                    {
-                        var desc = Memory.ReadUnicodeString(descPtr, 128, true);
-                        if (!string.IsNullOrEmpty(desc))
-                        {
-                            zone.Name = desc;
-                        }
-                    }
-                }
-                catch
-                {
-                    // Description not available
-                }
-            }
-
-            _zones[zoneId] = zone;
-            DebugLogger.LogDebug($"[QuestManager] Found zone: {zoneId} ({zoneType}) at {position}");
-        }
-
-        /// <summary>
-        /// Get the world position of a MonoBehaviour's transform.
-        /// </summary>
-        private static Vector3 GetTransformPosition(ulong monoBehaviour)
-        {
-            try
-            {
-                var gameObject = Memory.ReadPtr(monoBehaviour + UnitySDK.UnityOffsets.Component_GameObjectOffset);
-                if (gameObject == 0)
-                    return Vector3.Zero;
-
-                var components = Memory.ReadPtr(gameObject + UnitySDK.UnityOffsets.GameObject_ComponentsOffset);
-                if (components == 0)
-                    return Vector3.Zero;
-
-                var transformInternal = Memory.ReadPtr(components + 0x8);
-                if (transformInternal == 0)
-                    return Vector3.Zero;
-
-                var transform = new UnityTransform(transformInternal, true);
-                return transform.UpdatePosition();
-            }
-            catch
-            {
-                return Vector3.Zero;
-            }
-        }
-
-        /// <summary>
-        /// Update the set of active quest items and zones.
-        /// </summary>
-        private void UpdateActiveItems()
-        {
-            var itemIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var zoneIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            // Get tracked quest IDs from config
-            var trackedQuestIds = App.Config.QuestHelper.TrackedQuests;
-
-            foreach (var quest in ActiveQuests)
-            {
-                // Only process quests that are tracked (or all quests if no quests are tracked)
-                bool isTracked = trackedQuestIds.Count == 0 || trackedQuestIds.Contains(quest.Id);
-                if (!isTracked)
-                    continue;
-
-                foreach (var itemId in quest.RequiredItemIds)
-                {
-                    itemIds.Add(itemId);
-                }
-                foreach (var zoneId in quest.RequiredZoneIds)
-                {
-                    zoneIds.Add(zoneId);
-                }
-            }
-
-            ActiveQuestItemIds = itemIds;
-            ActiveQuestZoneIds = zoneIds;
-
-            // Update zone active status based on active AND tracked quests
-            foreach (var zone in _zones.Values)
-            {
-                // Zone is active if it's in the required zones for active+tracked quests
-                bool isActive = zoneIds.Contains(zone.Id);
-                
-                // Also check the QuestDatabase for zone-to-quest mapping
-                if (!isActive && QuestDatabase.IsInitialized)
-                {
-                    var questsForZone = QuestDatabase.GetQuestsForZone(zone.Id);
-                    foreach (var questInfo in questsForZone)
-                    {
-                        if (_quests.TryGetValue(questInfo.Id, out var quest) && quest.IsActive)
-                        {
-                            // Check if this quest is tracked
-                            bool questIsTracked = trackedQuestIds.Count == 0 || trackedQuestIds.Contains(questInfo.Id);
-                            if (questIsTracked)
-                            {
-                                isActive = true;
-                                zone.QuestName = questInfo.Name; // Set quest name for display
-                                zone.QuestId = questInfo.Id;
-                                break;
-                            }
-                        }
-                    }
-                }
-                
-                zone.IsActive = isActive;
-            }
-        }
-
-        #endregion
     }
 }

@@ -34,6 +34,7 @@ namespace LoneEftDmaRadar.UI.Skia
     {
         private static readonly SKPath _arrowBase = CreateArrowPath();
         private static readonly SKPath _minePath = CreateMineMarkerPath();
+        private static readonly SKPath _hazardPath = CreateHazardMarkerPath();
 
         private static SKPath CreateArrowPath()
         {
@@ -57,6 +58,18 @@ namespace LoneEftDmaRadar.UI.Skia
             path.MoveTo(-len, -len);
             path.LineTo(len, len);
 
+            return path;
+        }
+
+        private static SKPath CreateHazardMarkerPath()
+        {
+            // Triangle hazard marker (warning symbol)
+            const float size = 6f;
+            var path = new SKPath();
+            path.MoveTo(0, -size);           // Top
+            path.LineTo(-size, size * 0.6f); // Bottom left
+            path.LineTo(size, size * 0.6f);  // Bottom right
+            path.Close();
             return path;
         }
 
@@ -223,6 +236,20 @@ namespace LoneEftDmaRadar.UI.Skia
             canvas.Translate(zoomedMapPos.X, zoomedMapPos.Y);
             canvas.Scale(scale, scale);
             canvas.DrawPath(_minePath, SKPaints.PaintExplosives);
+            canvas.Restore();
+        }
+
+        /// <summary>
+        /// Draws a Hazard Marker (triangle warning symbol) on this zoomed location.
+        /// </summary>
+        public static void DrawHazardMarker(this SKPoint zoomedMapPos, SKCanvas canvas)
+        {
+            float scale = App.Config.UI.UIScale;
+
+            canvas.Save();
+            canvas.Translate(zoomedMapPos.X, zoomedMapPos.Y);
+            canvas.Scale(scale, scale);
+            canvas.DrawPath(_hazardPath, SKPaints.PaintHazard);
             canvas.Restore();
         }
 

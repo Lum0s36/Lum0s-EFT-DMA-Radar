@@ -46,7 +46,7 @@ namespace SDK
 
         public readonly partial struct BTRTurretView
         {
-            public const uint AttachedBot = 0x60; // System.ValueTuple<ObservedPlayerView, Boolean>
+            public const uint _bot = 0x60; // System.ValueTuple<ObservedPlayerView, Boolean>
         }
 
         public readonly partial struct Throwable
@@ -104,8 +104,9 @@ namespace SDK
             public const uint Id = 0x10; // String
             public const uint AccountId = 0x18; // String
             public const uint Info = 0x48; // -.\uE9AD
-            public const uint WishlistManager = 0x108; // EFT.WishlistManager
+            public const uint TaskConditionCounters = 0x90; // Dictionary<MongoID, TaskConditionCounter>
             public const uint QuestsData = 0x98; // System.Collections.Generic.List<QuestStatusData>
+            public const uint WishlistManager = 0x108; // EFT.WishlistManager
         }
 
         public readonly partial struct WishlistManager
@@ -357,10 +358,22 @@ namespace SDK
         public readonly partial struct QuestStatusData // EFT.Quests.QuestStatusData
         {
             public const uint Id = 0x10; // System.String (Quest Template ID)
+            public const uint StartTime = 0x18; // System.Int32 (Unix timestamp)
             public const uint Status = 0x1C; // System.Int32 (EQuestStatus)
-            public const uint StartTime = 0x20; // System.Int32 (Unix timestamp)
-            public const uint AvailableAfter = 0x24; // System.Int32 (Unix timestamp)
+            public const uint StatusStartTimestamps = 0x20; // GenericInst
             public const uint CompletedConditions = 0x28; // System.Collections.Generic.HashSet<MongoID>
+            public const uint AvailableAfter = 0x30; // System.Int32 (Unix timestamp)
+        }
+
+        public readonly partial struct TaskConditionCounter // EFT.Quests.TaskConditionCounter
+        {
+            public const uint OnValueChanged = 0x10; // Action<TaskConditionCounter>
+            public const uint Id = 0x18; // MongoID
+            public const uint Type = 0x30; // String
+            public const uint SourceId = 0x38; // String
+            public const uint Value = 0x40; // Int32 - The current progress count
+            public const uint Template = 0x48; // Condition
+            public const uint Conditional = 0x50; // IConditional
         }
 
         public readonly partial struct TriggerWithId // EFT.Interactive.TriggerWithId

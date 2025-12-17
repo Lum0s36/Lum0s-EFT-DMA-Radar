@@ -83,7 +83,8 @@ namespace LoneEftDmaRadar.Web.TarkovDev.Data
             var result = new OutgoingTarkovMarketData
             {
                 Items = ParseMarketData(data),
-                Maps = data.Data.Maps ?? new List<object>(),
+                Maps = data.Data.Maps ?? new List<MapDataElement>(),
+                PlayerLevels = data.Data.PlayerLevels ?? new List<PlayerLevelElement>(),
                 Tasks = data.Data.Tasks ?? new List<TaskElement>()
             };
             return JsonSerializer.Serialize(result);
@@ -143,7 +144,10 @@ namespace LoneEftDmaRadar.Web.TarkovDev.Data
             public List<OutgoingItem> Items { get; set; }
 
             [JsonPropertyName("maps")]
-            public List<object> Maps { get; set; }
+            public List<MapDataElement> Maps { get; set; }
+
+            [JsonPropertyName("playerLevels")]
+            public List<PlayerLevelElement> PlayerLevels { get; set; }
 
             [JsonPropertyName("tasks")]
             public List<TaskElement> Tasks { get; set; }

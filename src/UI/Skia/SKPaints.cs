@@ -463,6 +463,23 @@ namespace LoneEftDmaRadar.UI.Skia
             IsAntialias = true,
         };
 
+        public static SKPaint PaintQuestZone { get; } = new()
+        {
+            Color = SKColors.Yellow,
+            StrokeWidth = 3,
+            Style = SKPaintStyle.Fill,
+            IsAntialias = true,
+        };
+
+        public static SKPaint TextQuestZone { get; } = new()
+        {
+            Color = SKColors.Yellow,
+            IsStroke = false,
+            TextSize = 13,
+            TextEncoding = SKTextEncoding.Utf8,
+            IsAntialias = true,
+        };
+
         #endregion
 
         #region Render/Misc Paints
@@ -523,6 +540,21 @@ namespace LoneEftDmaRadar.UI.Skia
         public static SKPaint TextExfil { get; } = new()
         {
             Color = SKColors.White,
+            IsStroke = false,
+            IsAntialias = true,
+        };
+
+        public static SKPaint PaintHazard { get; } = new()
+        {
+            Color = SKColors.OrangeRed,
+            StrokeWidth = 2f,
+            Style = SKPaintStyle.Stroke,
+            IsAntialias = true,
+        };
+
+        public static SKPaint TextHazard { get; } = new()
+        {
+            Color = SKColors.OrangeRed,
             IsStroke = false,
             IsAntialias = true,
         };

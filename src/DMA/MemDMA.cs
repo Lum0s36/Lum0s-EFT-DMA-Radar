@@ -33,6 +33,7 @@ using LoneEftDmaRadar.Tarkov.GameWorld;
 using LoneEftDmaRadar.Tarkov.GameWorld.Camera;
 using LoneEftDmaRadar.Tarkov.GameWorld.Exits;
 using LoneEftDmaRadar.Tarkov.GameWorld.Explosives;
+using LoneEftDmaRadar.Tarkov.GameWorld.Hazards;
 using LoneEftDmaRadar.Tarkov.GameWorld.Loot;
 using LoneEftDmaRadar.Tarkov.GameWorld.Player;
 using LoneEftDmaRadar.Tarkov.Unity.Structures;
@@ -95,6 +96,7 @@ namespace LoneEftDmaRadar.DMA
         public IReadOnlyCollection<AbstractPlayer> Players => Game?.Players;
         public IReadOnlyCollection<IExplosiveItem> Explosives => Game?.Explosives;
         public IReadOnlyCollection<IExitPoint> Exits => Game?.Exits;
+        public IReadOnlyList<IWorldHazard> Hazards => Game?.Hazards;
         public LocalPlayer LocalPlayer => Game?.LocalPlayer;
         public LootManager Loot => Game?.Loot;
         public LocalGameWorld Game { get; private set; }

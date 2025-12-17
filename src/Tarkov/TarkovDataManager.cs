@@ -30,7 +30,6 @@ using LoneEftDmaRadar.Tarkov.GameWorld.Quests;
 using LoneEftDmaRadar.UI.Misc;
 using LoneEftDmaRadar.Web.TarkovDev.Data;
 using System.Collections.Frozen;
-using QuestObjectiveType = LoneEftDmaRadar.Tarkov.GameWorld.Quests.QuestObjectiveType;
 
 namespace LoneEftDmaRadar.Tarkov
 {
@@ -260,117 +259,6 @@ namespace LoneEftDmaRadar.Tarkov
                 NameId = "Terminal"
             });
             MapData = maps.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
-            
-            // Initialize QuestDatabase for QuestManager compatibility
-            InitializeQuestDatabase();
-        }
-
-        /// <summary>
-        /// Initializes the QuestDatabase from TaskData for QuestManager compatibility.
-        /// </summary>
-        private static void InitializeQuestDatabase()
-        {
-            try
-            {
-                if (TaskData == null || TaskData.Count == 0)
-                {
-                    DebugLogger.LogDebug("[TarkovDataManager] No TaskData available for QuestDatabase initialization");
-                    return;
-                }
-
-                DebugLogger.LogDebug($"[TarkovDataManager] Initializing QuestDatabase with {TaskData.Count} tasks");
-
-                // Convert TaskData to API format for QuestDatabase
-                var tasks = TaskData.Values.Select(t => new Web.TarkovDev.Data.TaskElement
-                {
-                    Id = t.Id,
-                    Name = t.Name,
-                    Trader = t.Trader != null ? new Web.TarkovDev.Data.TraderElement
-                    {
-                        Name = t.Trader.Name
-                    } : null,
-                    Map = t.Map != null ? new Web.TarkovDev.Data.MapReferenceElement
-                    {
-                        NameId = t.Map.NameId,
-                        Name = t.Map.Name
-                    } : null,
-                    NeededKeys = t.NeededKeys?.Select(nk => new Web.TarkovDev.Data.NeededKeyGroupElement
-                    {
-                        Keys = nk.Keys?.Select(k => new Web.TarkovDev.Data.ItemReferenceElement
-                        {
-                            Id = k.Id,
-                            Name = k.Name,
-                            ShortName = k.ShortName
-                        }).ToList(),
-                        Map = nk.Map != null ? new Web.TarkovDev.Data.MapReferenceElement
-                        {
-                            NameId = nk.Map.NameId,
-                            Name = nk.Map.Name
-                        } : null
-                    }).ToList(),
-                    Objectives = t.Objectives?.Select(o => new Web.TarkovDev.Data.TaskObjectiveElement
-                    {
-                        Id = o.Id,
-                        Type = o._type,
-                        Description = o.Description,
-                        Count = o.Count,
-                        FoundInRaid = o.FoundInRaid,
-                        Item = o.Item != null ? new Web.TarkovDev.Data.ItemReferenceElement
-                        {
-                            Id = o.Item.Id,
-                            Name = o.Item.Name,
-                            ShortName = o.Item.ShortName
-                        } : null,
-                        QuestItem = o.QuestItem != null ? new Web.TarkovDev.Data.QuestItemReferenceElement
-                        {
-                            Id = o.QuestItem.Id,
-                            Name = o.QuestItem.Name,
-                            ShortName = o.QuestItem.ShortName
-                        } : null,
-                        MarkerItem = o.MarkerItem != null ? new Web.TarkovDev.Data.ItemReferenceElement
-                        {
-                            Id = o.MarkerItem.Id,
-                            Name = o.MarkerItem.Name
-                        } : null,
-                        RequiredKeys = o.RequiredKeys?.Select(keyList => 
-                            keyList?.Select(k => new Web.TarkovDev.Data.ItemReferenceElement
-                            {
-                                Id = k.Id,
-                                Name = k.Name,
-                                ShortName = k.ShortName
-                            }).ToList()
-                        ).ToList(),
-                        Maps = o.Maps?.Select(m => new Web.TarkovDev.Data.MapReferenceElement
-                        {
-                            NameId = m.NameId,
-                            Name = m.Name
-                        }).ToList(),
-                        Zones = o.Zones?.Select(z => new Web.TarkovDev.Data.ZoneElement
-                        {
-                            Id = z.Id,
-                            Map = z.Map != null ? new Web.TarkovDev.Data.MapReferenceElement
-                            {
-                                NameId = z.Map.NameId,
-                                Name = z.Map.Name
-                            } : null,
-                            Position = z.Position != null ? new Web.TarkovDev.Data.PositionElement
-                            {
-                                X = z.Position.X,
-                                Y = z.Position.Y,
-                                Z = z.Position.Z
-                            } : null
-                        }).ToList()
-                    }).ToList()
-                }).ToList();
-
-                QuestDatabase.Initialize(tasks);
-                DebugLogger.LogDebug($"[TarkovDataManager] QuestDatabase initialized: {QuestDatabase.IsInitialized}, Quests: {QuestDatabase.AllQuests.Count}");
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.LogDebug($"[TarkovDataManager] QuestDatabase initialization failed: {ex}");
-                // QuestDatabase initialization failure should not break the main data loading
-            }
         }
 
         /// <summary>

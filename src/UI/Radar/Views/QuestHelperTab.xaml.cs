@@ -51,9 +51,9 @@ namespace LoneEftDmaRadar.UI.Radar.Views
 
         private void ExpandButton_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button button && button.Tag is QuestTrackingEntry quest)
+            if (sender is Button button && button.DataContext is QuestTrackingEntry entry)
             {
-                quest.ToggleExpanded();
+                entry.ToggleExpanded();
             }
         }
     }

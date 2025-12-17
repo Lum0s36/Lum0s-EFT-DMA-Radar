@@ -32,6 +32,7 @@ using LoneEftDmaRadar.Misc.Workers;
 using LoneEftDmaRadar.Tarkov.Features.MemWrites;
 using LoneEftDmaRadar.Tarkov.GameWorld.Exits;
 using LoneEftDmaRadar.Tarkov.GameWorld.Explosives;
+using LoneEftDmaRadar.Tarkov.GameWorld.Hazards;
 using LoneEftDmaRadar.Tarkov.GameWorld.Loot;
 using LoneEftDmaRadar.Tarkov.GameWorld.Player;
 using LoneEftDmaRadar.Tarkov.GameWorld.Quests;
@@ -83,6 +84,11 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
         /// </summary>
         public QuestManager QuestManager => _questManager;
 
+        /// <summary>
+        /// World Hazards (minefields, radiation zones, etc.) for the current map.
+        /// </summary>
+        public IReadOnlyList<IWorldHazard> Hazards { get; }
+
         private LocalGameWorld() { }
 
         /// <summary>
@@ -124,7 +130,10 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
                 _exfilManager = new(mapID, _rgtPlayers.LocalPlayer.IsPmc);
                 _explosivesManager = new(localGameWorld);
                 _memWritesManager = new MemWritesManager();
-                _questManager = new QuestManager(localGameWorld);
+                // QuestManager needs the LocalPlayer's Profile pointer
+                var profilePtr = _rgtPlayers.LocalPlayer?.Profile ?? 0;
+                _questManager = new QuestManager(profilePtr);
+                Hazards = GetHazards(mapID);
                 _t4 = new WorkerThread()
                 {
                     Name = "MemWrites Worker",
@@ -138,6 +147,29 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
                 Dispose();
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Loads hazard data for the specified map from TarkovDataManager.
+        /// </summary>
+        private static List<IWorldHazard> GetHazards(string mapId)
+        {
+            var list = new List<IWorldHazard>();
+            if (TarkovDataManager.MapData?.TryGetValue(mapId, out var mapData) == true)
+            {
+                if (mapData.Hazards != null)
+                {
+                    foreach (var hazard in mapData.Hazards)
+                    {
+                        list.Add(new GenericWorldHazard
+                        {
+                            HazardType = hazard.HazardType,
+                            Position = hazard.Position?.AsVector3() ?? Vector3.Zero
+                        });
+                    }
+                }
+            }
+            return list;
         }
 
         /// <summary>
@@ -343,8 +375,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
 
             try
             {
-                var profilePtr = LocalPlayer?.Profile ?? 0;
-                _questManager?.Refresh(profilePtr, ct);
+                _questManager?.Refresh(ct);
             }
             catch (Exception ex)
             {
@@ -463,7 +494,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld
                 var btrController = Memory.ReadPtr(this + Offsets.GameWorld.BtrController);
                 var btrView = Memory.ReadPtr(btrController + Offsets.BtrController.BtrView);
                 var btrTurretView = Memory.ReadPtr(btrView + Offsets.BTRView.turret);
-                var btrOperator = Memory.ReadPtr(btrTurretView + Offsets.BTRTurretView.AttachedBot);
+                var btrOperator = Memory.ReadPtr(btrTurretView + Offsets.BTRTurretView._bot);
                 _rgtPlayers.TryAllocateBTR(btrView, btrOperator);
             }
             catch (Exception ex)

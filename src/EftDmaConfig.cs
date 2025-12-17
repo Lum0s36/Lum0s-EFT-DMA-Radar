@@ -562,6 +562,18 @@ namespace LoneEftDmaRadar
         public bool ShowMines { get; set; } = true;
 
         /// <summary>
+        /// Show Hazard zones (minefields, radiation, etc.) on Radar.
+        /// </summary>
+        [JsonPropertyName("showHazards")]
+        public bool ShowHazards { get; set; } = true;
+
+        /// <summary>
+        /// Show Exfil points on Radar.
+        /// </summary>
+        [JsonPropertyName("showExfils")]
+        public bool ShowExfils { get; set; } = true;
+
+        /// <summary>
         /// Hides player names & extended player info in Radar GUI.
         /// </summary>
         [JsonPropertyName("hideNames")]
@@ -1377,10 +1389,10 @@ namespace LoneEftDmaRadar
         public bool Enabled { get; set; } = true;
 
         /// <summary>
-        /// True if quest zones should be shown on the radar.
+        /// True if quest locations should be shown on the radar.
         /// </summary>
-        [JsonPropertyName("showZones")]
-        public bool ShowZones { get; set; } = true;
+        [JsonPropertyName("showLocations")]
+        public bool ShowLocations { get; set; } = true;
 
         /// <summary>
         /// True if Active Only mode is enabled (filters to active quests for current map when in raid).
@@ -1426,10 +1438,17 @@ namespace LoneEftDmaRadar
         public SKRect WidgetLocation { get; set; }
 
         /// <summary>
-        /// Set of tracked quest IDs.
+        /// Set of tracked quest IDs (user-selected quests to track).
         /// </summary>
         [JsonPropertyName("trackedQuests")]
         [JsonInclude]
         public HashSet<string> TrackedQuests { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Blacklisted quest IDs (quests user doesn't want to track - used by LONE's QuestEntry).
+        /// </summary>
+        [JsonPropertyName("blacklistedQuests")]
+        [JsonInclude]
+        public ConcurrentDictionary<string, byte> BlacklistedQuests { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
     }
 }

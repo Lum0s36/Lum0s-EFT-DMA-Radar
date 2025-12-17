@@ -818,12 +818,9 @@ namespace LoneEftDmaRadar.UI.ESP
             float distance = Vector3.Distance(localPlayer.Position, player.Position);
             float maxDistance = isAI ? App.Config.UI.EspAIMaxDistance : App.Config.UI.EspPlayerMaxDistance;
 
-            // If maxDistance is 0, it means unlimited, otherwise check distance
+            // If maxDistance is 0, it means truly unlimited - no distance check at all
+            // If maxDistance > 0, check if player is within range
             if (maxDistance > 0 && distance > maxDistance)
-                return;
-
-            // Fallback to old MaxDistance if the new settings aren't configured
-            if (maxDistance == 0 && distance > App.Config.UI.MaxDistance)
                 return;
 
             // Get Color

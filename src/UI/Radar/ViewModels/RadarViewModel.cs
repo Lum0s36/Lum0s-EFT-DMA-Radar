@@ -30,6 +30,7 @@ using Collections.Pooled;
 using LoneEftDmaRadar.Tarkov;
 using LoneEftDmaRadar.Tarkov.GameWorld.Exits;
 using LoneEftDmaRadar.Tarkov.GameWorld.Explosives;
+using LoneEftDmaRadar.Tarkov.GameWorld.Hazards;
 using LoneEftDmaRadar.Tarkov.GameWorld.Loot;
 using LoneEftDmaRadar.Tarkov.GameWorld.Player;
 using LoneEftDmaRadar.Tarkov.GameWorld.Quests;
@@ -105,6 +106,11 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
         /// Contains all 'Exits' in Local Game World, and their status/position(s).
         /// </summary>
         private static IReadOnlyCollection<IExitPoint> Exits => Memory?.Exits;
+
+        /// <summary>
+        /// Contains all 'Hazards' (minefields, radiation zones, etc.) in Local Game World.
+        /// </summary>
+        private static IReadOnlyList<IWorldHazard> Hazards => Memory?.Hazards;
 
         /// <summary>
         /// Item Search Filter has been set/applied.
@@ -476,7 +482,16 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                         }
                     }
 
-                    if (Exits is IReadOnlyCollection<IExitPoint> exits)
+                    if (App.Config.UI.ShowHazards &&
+                        Hazards is IReadOnlyList<IWorldHazard> hazards) // Draw Hazards (minefields, radiation, etc.)
+                    {
+                        foreach (var hazard in hazards)
+                        {
+                            hazard.Draw(canvas, mapParams, localPlayer);
+                        }
+                    }
+
+                    if (App.Config.UI.ShowExfils && Exits is IReadOnlyCollection<IExitPoint> exits)
                     {
                         foreach (var exit in exits)
                         {
@@ -523,15 +538,15 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                     // Draw LocalPlayer over everything else
                     localPlayer.Draw(canvas, mapParams, localPlayer);
 
-                    // Draw active quest zones (if enabled)
-                    if (App.Config.QuestHelper.Enabled && App.Config.QuestHelper.ShowZones)
+                    // Draw active quest locations (if enabled)
+                    if (App.Config.QuestHelper.Enabled && App.Config.QuestHelper.ShowLocations)
                     {
                         var questManager = Memory.Game?.QuestManager;
                         if (questManager != null)
                         {
-                            foreach (var zone in questManager.ActiveZones)
+                            foreach (var location in questManager.LocationConditions.Values)
                             {
-                                zone.Draw(canvas, mapParams, localPlayer);
+                                location.Draw(canvas, mapParams, localPlayer);
                             }
                         }
                     }

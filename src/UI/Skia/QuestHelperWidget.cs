@@ -177,61 +177,21 @@ namespace LoneEftDmaRadar.UI.Skia
             if (questManager == null)
                 return;
 
-            // Get tracked quest IDs
-            var trackedIds = config.TrackedQuests;
-
-            // Process active quests that are tracked
-            foreach (var quest in questManager.ActiveQuests)
+            // Process active quests that are not blacklisted
+            foreach (var questEntry in questManager.Quests.Values)
             {
-                // Skip if not tracked (or if no quests are tracked, show all active)
-                if (trackedIds.Count > 0 && !trackedIds.Contains(quest.Id))
+                // Skip if blacklisted
+                if (config.BlacklistedQuests.ContainsKey(questEntry.Id))
                     continue;
 
                 // Check if quest has objectives on current map
-                if (!HasObjectivesOnMap(quest.Id, mapId))
+                if (!HasObjectivesOnMap(questEntry.Id, mapId))
                     continue;
 
-                // Apply Kappa filter if enabled
-                if (config.KappaOnly && !IsKappaQuest(quest.Id))
-                    continue;
-
-                // Apply Lightkeeper filter if enabled
-                if (config.LightkeeperOnly && !IsLightkeeperQuest(quest.Id))
-                    continue;
-
-                var entry = CreateQuestDisplayEntry(quest);
+                var entry = CreateQuestDisplayEntry(questEntry);
                 if (entry != null)
                     _cachedQuests.Add(entry);
             }
-        }
-
-        /// <summary>
-        /// Checks if a quest is required for Kappa container.
-        /// </summary>
-        private static bool IsKappaQuest(string questId)
-        {
-            if (string.IsNullOrEmpty(questId))
-                return false;
-
-            if (!TarkovDataManager.TaskData.TryGetValue(questId, out var task))
-                return false;
-
-            return task.KappaRequired;
-        }
-
-        /// <summary>
-        /// Checks if a quest is required for Lightkeeper.
-        /// </summary>
-        private static bool IsLightkeeperQuest(string questId)
-        {
-            if (string.IsNullOrEmpty(questId))
-                return false;
-
-            if (!TarkovDataManager.TaskData.TryGetValue(questId, out var task))
-                return false;
-
-            return task.LightkeeperRequired || 
-                   (task.Trader?.Name?.Equals("Lightkeeper", StringComparison.OrdinalIgnoreCase) ?? false);
         }
 
         private static bool HasObjectivesOnMap(string questId, string mapId)
@@ -308,7 +268,7 @@ namespace LoneEftDmaRadar.UI.Skia
             return false;
         }
 
-        private QuestDisplayEntry CreateQuestDisplayEntry(QuestData quest)
+        private QuestDisplayEntry CreateQuestDisplayEntry(QuestEntry quest)
         {
             if (!TarkovDataManager.TaskData.TryGetValue(quest.Id, out var task))
                 return null;
@@ -361,18 +321,20 @@ namespace LoneEftDmaRadar.UI.Skia
                 ? "Objectives: | " + string.Join(" | ", headerParts.Take(3)) 
                 : "Objectives:";
 
-            // Build objectives list
+            // Build objectives list with live progress from quest entry
             if (task.Objectives != null)
             {
                 foreach (var obj in task.Objectives)
                 {
-                    var isCompleted = quest.CompletedConditions.Contains(obj.Id);
+                    // Get live progress from quest entry
+                    var isCompleted = quest.IsObjectiveCompleted(obj.Id);
+                    var currentCount = quest.GetObjectiveProgress(obj.Id);
                     
                     var objEntry = new ObjectiveDisplayEntry
                     {
                         TypeIcon = GetTypeIcon(obj.Type),
                         Description = obj.Description ?? GetDefaultDescription(obj),
-                        Progress = GetProgressText(obj, isCompleted),
+                        Progress = GetProgressText(obj, currentCount, isCompleted),
                         IsCompleted = isCompleted
                     };
                     
@@ -411,14 +373,14 @@ namespace LoneEftDmaRadar.UI.Skia
             };
         }
 
-        private static string GetProgressText(TarkovDataManager.TaskElement.ObjectiveElement obj, bool isCompleted)
+        private static string GetProgressText(TarkovDataManager.TaskElement.ObjectiveElement obj, int currentCount, bool isCompleted)
         {
             if (isCompleted)
                 return "DONE";
             
-            // For objectives with count, show 0/count
+            // For objectives with count, show currentCount/totalCount
             if (obj.Count > 0)
-                return $"0/{obj.Count}";
+                return $"{currentCount}/{obj.Count}";
             
             return "";
         }

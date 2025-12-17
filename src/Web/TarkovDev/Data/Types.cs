@@ -74,7 +74,10 @@ namespace LoneEftDmaRadar.Web.TarkovDev.Data
             public List<ItemElement> Items { get; set; }
 
             [JsonPropertyName("maps")]
-            public List<object> Maps { get; set; }
+            public List<MapDataElement> Maps { get; set; }
+
+            [JsonPropertyName("playerLevels")]
+            public List<PlayerLevelElement> PlayerLevels { get; set; }
 
             [JsonPropertyName("tasks")]
             public List<TaskElement> Tasks { get; set; }
@@ -175,6 +178,76 @@ namespace LoneEftDmaRadar.Web.TarkovDev.Data
         [JsonPropertyName("name")]
         public string Name { get; set; }
     }
+
+    #region Map API Types
+
+    /// <summary>
+    /// Map data element from tarkov.dev API.
+    /// </summary>
+    public class MapDataElement
+    {
+        [JsonPropertyName("name")]
+        public string Name { get; set; }
+
+        [JsonPropertyName("nameId")]
+        public string NameId { get; set; }
+
+        [JsonPropertyName("extracts")]
+        public List<ExtractDataElement> Extracts { get; set; } = new();
+
+        [JsonPropertyName("transits")]
+        public List<TransitDataElement> Transits { get; set; } = new();
+
+        [JsonPropertyName("hazards")]
+        public List<HazardDataElement> Hazards { get; set; } = new();
+    }
+
+    public class ExtractDataElement
+    {
+        [JsonPropertyName("name")]
+        public string Name { get; set; }
+
+        [JsonPropertyName("faction")]
+        public string Faction { get; set; }
+
+        [JsonPropertyName("position")]
+        public PositionElement Position { get; set; }
+
+        [JsonIgnore]
+        public bool IsPmc => Faction?.Equals("pmc", StringComparison.OrdinalIgnoreCase) ?? false;
+        
+        [JsonIgnore]
+        public bool IsShared => Faction?.Equals("shared", StringComparison.OrdinalIgnoreCase) ?? false;
+    }
+
+    public class TransitDataElement
+    {
+        [JsonPropertyName("description")]
+        public string Description { get; set; }
+
+        [JsonPropertyName("position")]
+        public PositionElement Position { get; set; }
+    }
+
+    public class HazardDataElement
+    {
+        [JsonPropertyName("hazardType")]
+        public string HazardType { get; set; }
+
+        [JsonPropertyName("position")]
+        public PositionElement Position { get; set; }
+    }
+
+    public class PlayerLevelElement
+    {
+        [JsonPropertyName("level")]
+        public int Level { get; set; }
+
+        [JsonPropertyName("exp")]
+        public int Exp { get; set; }
+    }
+
+    #endregion
 
     #region Task/Quest API Types
 

@@ -74,7 +74,8 @@ namespace LoneEftDmaRadar.Tarkov.Unity.Collections
             }
         }
 
-        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        // Pack = 1 to match Unity/Mono memory layout for HashSet entries
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
         public readonly struct MemHashEntry
         {
             public static implicit operator T(MemHashEntry x) => x.Value;

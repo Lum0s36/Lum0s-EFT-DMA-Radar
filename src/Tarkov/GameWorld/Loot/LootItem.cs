@@ -289,10 +289,19 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
         {
             using var lines = new PooledList<string>();
             
-            lines.Add(GetUILabel());
+            // For quest items, show special header
+            if (IsQuestItem)
+            {
+                lines.Add("QUEST ITEM");
+                lines.Add($"PICK UP: {Name.Replace("Q_", "")}");
+            }
+            else
+            {
+                lines.Add(GetUILabel());
+            }
             
             // Show distance
-            float distance = Vector3.Distance(localPlayer.Position, Position);
+            float distance = MathF.Sqrt(Vector3.DistanceSquared(localPlayer.Position, Position));
             lines.Add($"Distance: {distance:F0}m");
             
             Position.ToMapPos(mapParams.Map).ToZoomedPos(mapParams).DrawMouseoverText(canvas, lines.Span);
@@ -305,6 +314,14 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
         public string GetUILabel()
         {
             var label = "";
+            
+            // Quest items get special prefix
+            if (IsQuestItem)
+            {
+                label = "Q: " + Name.Replace("Q_", "");
+                return label;
+            }
+            
             // "!!" for Wishlist items
             if (IsWishlisted)
                 label += "!! ";

@@ -91,6 +91,10 @@ namespace LoneEftDmaRadar.Web.TarkovDev.Data
                             description
                             position {x,y,z}
                         }
+                        hazards {
+                            hazardType
+                            position {x,y,z}
+                        }
                     }
                     items { 
                         id 
@@ -117,6 +121,10 @@ namespace LoneEftDmaRadar.Web.TarkovDev.Data
                         id 
                         normalizedName 
                         name 
+                    }
+                    playerLevels {
+                        level
+                        exp
                     }
                     tasks {
                         id
