@@ -915,16 +915,19 @@ namespace LoneEftDmaRadar.UI.ESP
                     var head = headBone.Position;
                     if (head != Vector3.Zero && !float.IsNaN(head.X) && !float.IsNaN(head.Y) && !float.IsNaN(head.Z) && !float.IsInfinity(head.X) && !float.IsInfinity(head.Y) && !float.IsInfinity(head.Z))
                     {
-                        var headTop = head;
-                        headTop.Y += 0.18f;
-
-                        if (TryProject(headTop, screenWidth, screenHeight, out var headTopScreen))
+                        if (TryProject(head, screenWidth, screenHeight, out var headScreen))
                         {
-                            var dy = MathF.Abs(headTopScreen.Y - headScreen.Y);
-                            float radius = dy * 0.65f;
-                            radius = Math.Clamp(radius, 2f, 12f);
-                            
-                            ctx.DrawCircle(ToRaw(headScreen), radius, color, filled: false);
+                            var headTop = head;
+                            headTop.Y += 0.18f;
+
+                            if (TryProject(headTop, screenWidth, screenHeight, out var headTopScreen))
+                            {
+                                var dy = MathF.Abs(headTopScreen.Y - headScreen.Y);
+                                float radius = dy * 0.65f;
+                                radius = Math.Clamp(radius, 2f, 12f);
+                                
+                                ctx.DrawCircle(ToRaw(headScreen), radius, color, filled: false);
+                            }
                         }
                     }
                 }
@@ -1997,7 +2000,7 @@ namespace LoneEftDmaRadar.UI.ESP
             double width = App.Config.UI.EspScreenWidth > 0
                 ? App.Config.UI.EspScreenWidth
                 : monitor?.Width ?? SystemParameters.PrimaryScreenWidth;
-            double height = App Config.UI.EspScreenHeight > 0
+            double height = App.Config.UI.EspScreenHeight > 0
                 ? App.Config.UI.EspScreenHeight
                 : monitor?.Height ?? SystemParameters.PrimaryScreenHeight;
             return (width, height);
