@@ -170,6 +170,28 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
         public bool IsQuestItem => _isQuestItem;
 
         /// <summary>
+        /// True if this quest item is needed for an active quest.
+        /// Returns false if ShowQuestItems is disabled, or if the item is not for an active quest.
+        /// </summary>
+        public bool IsActiveQuestItem
+        {
+            get
+            {
+                if (!_isQuestItem)
+                    return false;
+                if (!App.Config.Loot.ShowQuestItems)
+                    return false;
+                
+                // Check if this quest item is for one of the player's active quests
+                var questManager = Memory.Game?.QuestManager;
+                if (questManager == null)
+                    return true; // Fallback: show all quest items if no quest manager
+                
+                return questManager.IsQuestItem(ID);
+            }
+        }
+
+        /// <summary>
         /// True if the item is blacklisted via the UI.
         /// </summary>
         public bool Blacklisted => CustomFilter?.Blacklisted ?? false;
@@ -239,7 +261,8 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
 
         public virtual void Draw(SKCanvas canvas, EftMapParams mapParams, LocalPlayer localPlayer)
         {
-            if (IsQuestItem && !App.Config.Loot.ShowQuestItems)
+            // For quest items: only draw if it's for an active quest
+            if (IsQuestItem && !IsActiveQuestItem)
                 return;
 
             var label = GetUILabel();

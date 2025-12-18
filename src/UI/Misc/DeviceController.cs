@@ -33,7 +33,9 @@ namespace LoneEftDmaRadar.UI.Misc
     public class Device
     {
         // --- gating for device smooth/bezier so we don't overlap commands ---
+#pragma warning disable CS0169 // Field is never used - reserved for future smooth/bezier gating
         private long _makcuBusyUntilTicks;             // when it's safe to send the next smooth/bezier
+#pragma warning restore CS0169
         private static readonly double _ticksPerMs = (double)Stopwatch.Frequency / 1000.0;
 
         // You can tune this if your firmware runs ~2-4ms per segment

@@ -475,8 +475,10 @@ namespace LoneEftDmaRadar.UI.Skia
         {
             Color = SKColors.Yellow,
             IsStroke = false,
+#pragma warning disable CS0618 // Type or member is obsolete - TextSize/TextEncoding still work in current SkiaSharp
             TextSize = 13,
             TextEncoding = SKTextEncoding.Utf8,
+#pragma warning restore CS0618
             IsAntialias = true,
         };
 

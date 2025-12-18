@@ -138,12 +138,17 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                 var loot = Loot ?? Enumerable.Empty<IMouseoverEntity>();
                 var containers = Containers ?? Enumerable.Empty<IMouseoverEntity>();
                 var exits = Exits ?? Enumerable.Empty<IMouseoverEntity>();
+                
+                // Quest locations (if enabled)
+                var questLocations = (App.Config.QuestHelper.Enabled && App.Config.QuestHelper.ShowLocations)
+                    ? (Memory.Game?.QuestManager?.LocationConditions?.Values ?? Enumerable.Empty<IMouseoverEntity>())
+                    : Enumerable.Empty<IMouseoverEntity>();
 
                 if (FilterIsSet && !(MainWindow.Instance?.Radar?.Overlay?.ViewModel?.HideCorpses ?? false)) // Item Search
                     players = players.Where(x =>
                         x.LootObject is null || !loot.Contains(x.LootObject)); // Don't show both corpse objects
 
-                var result = loot.Concat(containers).Concat(players).Concat(exits);
+                var result = loot.Concat(containers).Concat(players).Concat(exits).Concat(questLocations);
                 return result.Any() ? result : null;
             }
         }
@@ -789,6 +794,11 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
             var mouseX = (float)pt.X * _dpiScaleX;
             var mouseY = (float)pt.Y * _dpiScaleY;
             var mouse = new Vector2(mouseX, mouseY);
+            
+            // Widget focus management - clear focus on all widgets first, 
+            // they will set their own focus in their own MouseDown handlers
+            ClearAllWidgetFocus();
+            
             if (e.LeftButton is System.Windows.Input.MouseButtonState.Pressed)
             {
                 _lastMousePosition = mouse;
@@ -817,6 +827,18 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
             {
                 vm.IsLootOverlayVisible = false; // Hide Loot Overlay on Mouse Down
             }
+        }
+
+        /// <summary>
+        /// Clears focus from all widgets. Each widget will set its own focus
+        /// in its own MouseDown handler if clicked.
+        /// </summary>
+        private void ClearAllWidgetFocus()
+        {
+            if (AimviewWidget != null) AimviewWidget.IsFocused = false;
+            if (InfoWidget != null) InfoWidget.IsFocused = false;
+            if (LootInfoWidget != null) LootInfoWidget.IsFocused = false;
+            if (QuestHelperWidget != null) QuestHelperWidget.IsFocused = false;
         }
 
         private void Radar_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
@@ -906,6 +928,12 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                     case LootItem lootItem:
                         _mouseOverItem = lootItem;
                         CurrentMouseoverItem = lootItem;
+                        MouseoverGroup = null;
+                        break;
+                    
+                    case QuestLocation questLoc:
+                        _mouseOverItem = questLoc;
+                        CurrentMouseoverItem = questLoc;
                         MouseoverGroup = null;
                         break;
 

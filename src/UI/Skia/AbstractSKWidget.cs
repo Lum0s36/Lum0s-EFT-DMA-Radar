@@ -71,7 +71,7 @@ namespace LoneEftDmaRadar.UI.Skia
         public bool IsFocused 
         { 
             get => _isFocused;
-            protected set => _isFocused = value;
+            set => _isFocused = value;  // Allow external setting for widget manager to clear focus
         }
 
         public SKRect ClientRectangle => new(

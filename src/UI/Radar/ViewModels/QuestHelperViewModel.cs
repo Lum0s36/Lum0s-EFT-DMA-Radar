@@ -53,7 +53,11 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                     
                     var activeQuests = questManager.Quests;
                     
-                    await System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() =>
+                    var dispatcher = System.Windows.Application.Current?.Dispatcher;
+                    if (dispatcher == null)
+                        continue;
+                    
+                    await dispatcher.InvokeAsync(() =>
                     {
                         var activeIds = new HashSet<string>(activeQuests.Keys, StringComparer.OrdinalIgnoreCase);
                         
@@ -61,8 +65,9 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                         {
                             quest.IsActive = activeIds.Contains(quest.QuestId);
                             
-                            // Refresh progress for expanded quests
-                            if (quest.IsExpanded)
+                            // Refresh progress for ALL active quests (not just expanded ones)
+                            // This ensures widget and other displays stay in sync
+                            if (quest.IsActive)
                                 quest.RefreshObjectiveCompletionStatus();
                         }
                         
@@ -168,6 +173,22 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
         {
             get => App.Config.QuestHelper.ShowWidget;
             set { App.Config.QuestHelper.ShowWidget = value; OnPropertyChanged(nameof(ShowWidget)); }
+        }
+
+        public bool ShowQuestItems
+        {
+            get => App.Config.Loot.ShowQuestItems;
+            set 
+            { 
+                App.Config.Loot.ShowQuestItems = value; 
+                OnPropertyChanged(nameof(ShowQuestItems));
+                
+                // Also update ESP Quest Loot setting for consistency
+                App.Config.UI.EspQuestLoot = value;
+                
+                // Refresh loot filter to apply changes immediately
+                Memory.Game?.Loot?.RefreshFilter();
+            }
         }
 
         public float ZoneDrawDistance
@@ -718,15 +739,29 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                 // Check if completed
                 var wasCompleted = obj.IsCompleted;
                 var isCompleted = questEntry.IsObjectiveCompleted(obj.ObjectiveId);
-                obj.IsCompleted = isCompleted;
-                
-                if (isCompleted)
-                    completedCount++;
                 
                 // Get current progress count
                 var oldProgress = obj.CurrentCount;
                 var progress = questEntry.GetObjectiveProgress(obj.ObjectiveId);
                 obj.CurrentCount = progress;
+                
+                // Get target count from memory, update if available
+                var targetFromMemory = questEntry.GetObjectiveTargetCount(obj.ObjectiveId);
+                if (targetFromMemory > 0 && targetFromMemory != obj.Count)
+                {
+                    obj.Count = targetFromMemory;
+                }
+                
+                // Auto-complete if currentCount >= target count
+                if (!isCompleted && obj.Count > 0 && progress >= obj.Count)
+                {
+                    isCompleted = true;
+                }
+                
+                obj.IsCompleted = isCompleted;
+                
+                if (isCompleted)
+                    completedCount++;
                 
                 if (progress != oldProgress || wasCompleted != isCompleted)
                     updatedCount++;
@@ -855,11 +890,25 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                     // Get initial completion/progress state from memory
                     bool isCompleted = false;
                     int currentCount = 0;
+                    int targetCount = count; // Start with API value as default
                     
                     if (questEntry != null && !string.IsNullOrEmpty(obj.Id))
                     {
                         isCompleted = questEntry.IsObjectiveCompleted(obj.Id);
                         currentCount = questEntry.GetObjectiveProgress(obj.Id);
+                        
+                        // Get target count from memory if available
+                        var memoryTargetCount = questEntry.GetObjectiveTargetCount(obj.Id);
+                        if (memoryTargetCount > 0)
+                        {
+                            targetCount = memoryTargetCount;
+                        }
+                        
+                        // Auto-complete if currentCount >= targetCount
+                        if (!isCompleted && targetCount > 0 && currentCount >= targetCount)
+                        {
+                            isCompleted = true;
+                        }
                     }
 
                     Objectives.Add(new QuestObjectiveEntry
@@ -867,7 +916,7 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                         ObjectiveId = obj.Id,
                         Type = obj.Type,
                         Description = obj.Description ?? GetDefaultDescription(obj),
-                        Count = count,
+                        Count = targetCount, // Use memory target count if available
                         TypeIcon = GetIcon(obj.Type),
                         ZoneCount = obj.Zones?.Count ?? 0,
                         ItemName = obj.Item?.Name ?? obj.QuestItem?.Name,
@@ -968,6 +1017,12 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                 _currentCount = value; 
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CurrentCount)));
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ProgressText)));
+                
+                // Auto-complete if currentCount >= target count
+                if (Count > 0 && value >= Count && !_isCompleted)
+                {
+                    IsCompleted = true;
+                }
             }
         }
 
@@ -990,8 +1045,15 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
             get
             {
                 if (IsCompleted) return "DONE";
-                if (Type == QuestObjectiveType.Shoot) return $"{CurrentCount}/{(Count > 0 ? Count : "?")}";
-                if (Count > 0) return $"{CurrentCount}/{Count}";
+                
+                // For objectives with count, show progress
+                if (Count > 0)
+                    return $"{CurrentCount}/{Count}";
+                
+                // For shoot objectives without known count, show current count
+                if (Type == QuestObjectiveType.Shoot && CurrentCount > 0)
+                    return $"{CurrentCount}/?";
+                
                 return "";
             }
         }

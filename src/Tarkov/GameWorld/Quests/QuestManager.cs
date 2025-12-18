@@ -2,6 +2,8 @@
  * Lone EFT DMA Radar
  * Brought to you by Lone (Lone DMA)
  * 
+ * Quest Helper: Credit to LONE for the foundational implementation
+ * 
 MIT License
 
 Copyright (c) 2025 Lone DMA
@@ -44,9 +46,16 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Quests
         
         /// <summary>
         /// Cached condition counters from Profile.TaskConditionCounters
-        /// Key: MongoID string, Value: current count
+        /// Key: MongoID string, Value: (current count, target count)
         /// </summary>
-        private readonly ConcurrentDictionary<string, int> _conditionCounters = new(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, (int CurrentCount, int TargetCount)> _conditionCounters = new(StringComparer.OrdinalIgnoreCase);
+        
+        /// <summary>
+        /// Cached TaskConditionCounter pointers for fast value updates.
+        /// Key: condition ID, Value: (counterPtr, targetCount)
+        /// </summary>
+        private readonly ConcurrentDictionary<string, (ulong CounterPtr, int TargetCount)> _counterPointers = new(StringComparer.OrdinalIgnoreCase);
+        private bool _countersInitialized = false;
 
         public QuestManager(ulong profile)
         {
@@ -131,16 +140,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Quests
                         {
                             try
                             {
-                                using var completedHS = UnityHashSet<MongoID>.Create(completedConditionsPtr, true);
-                                foreach (var c in completedHS)
-                                {
-                                    var completedCond = c.Value.ReadString();
-                                    if (!string.IsNullOrEmpty(completedCond))
-                                    {
-                                        completedConditions.Add(completedCond);
-                                        DebugLogger.LogDebug($"[QuestManager] Quest {qId}: Completed condition {completedCond}");
-                                    }
-                                }
+                                ReadCompletedConditionsHashSet(completedConditionsPtr, completedConditions);
                             }
                             catch (Exception ex)
                             {
@@ -154,23 +154,34 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Quests
                         // Update quest entry with condition counters from profile
                         if (task.Objectives != null)
                         {
-                            using var counters = new PooledList<KeyValuePair<string, int>>();
+                            using var counters = new PooledList<KeyValuePair<string, (int CurrentCount, int TargetCount)>>();
                             foreach (var obj in task.Objectives)
                             {
                                 if (!string.IsNullOrEmpty(obj.Id))
                                 {
-                                    // First check if we have a counter from profile
+                                    // First check if we have a counter from profile (with both current and target from memory)
                                     if (_conditionCounters.TryGetValue(obj.Id, out var count))
                                     {
-                                        counters.Add(new KeyValuePair<string, int>(obj.Id, count));
+                                        // Use target from memory if available, otherwise use API value as fallback
+                                        int targetCount = count.TargetCount > 0 ? count.TargetCount : obj.Count;
+                                        counters.Add(new KeyValuePair<string, (int, int)>(obj.Id, (count.CurrentCount, targetCount)));
+                                        
+                                        // Debug log the match
+                                        DebugLogger.LogDebug($"[QuestManager] Matched objective '{obj.Id}' ({obj.Description?.Substring(0, Math.Min(30, obj.Description?.Length ?? 0))}...) = {count.CurrentCount}/{targetCount}");
                                     }
                                     // If objective is completed, set count to target
                                     else if (completedConditions.Contains(obj.Id) && obj.Count > 0)
                                     {
-                                        counters.Add(new KeyValuePair<string, int>(obj.Id, obj.Count));
+                                        counters.Add(new KeyValuePair<string, (int, int)>(obj.Id, (obj.Count, obj.Count)));
                                     }
                                 }
                             }
+                            
+                            if (counters.Count > 0)
+                            {
+                                DebugLogger.LogDebug($"[QuestManager] Quest '{task.Name}': Updating {counters.Count} counters from memory");
+                            }
+                            
                             questEntry.UpdateConditionCounters(counters);
                         }
 
@@ -215,114 +226,275 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Quests
         }
         
         /// <summary>
+        /// Read completed conditions from HashSet<MongoID> manually.
+        /// HashSet layout in Unity/Mono:
+        /// +0x18 = _slots array (contains entries)
+        /// +0x3C = _count
+        /// </summary>
+        private void ReadCompletedConditionsHashSet(ulong hashSetPtr, PooledList<string> results)
+        {
+            // HashSet<MongoID> layout:
+            // +0x18 = Slot[] _slots
+            // +0x3C = int _count
+            
+            var count = Memory.ReadValue<int>(hashSetPtr + 0x3C);
+            if (count <= 0 || count > 100)
+                return;
+            
+            var slotsArrayPtr = Memory.ReadPtr(hashSetPtr + 0x18);
+            if (slotsArrayPtr == 0)
+                return;
+            
+            // Array header: length at +0x18
+            var slotsArrayLength = Memory.ReadValue<int>(slotsArrayPtr + 0x18);
+            if (slotsArrayLength <= 0 || slotsArrayLength > 200)
+                return;
+            
+            // Slot struct for HashSet<MongoID>:
+            // struct Slot {
+            //     int hashCode;     // +0x00
+            //     int next;         // +0x04
+            //     MongoID value;    // +0x08 (0x18 bytes)
+            // }
+            // Total = 0x20 (32 bytes) with padding
+            
+            // However, with Pack=1 it would be 0x08 + 0x18 = 0x20
+            // Let's try different slot sizes
+            int[] slotSizes = { 0x20, 0x28, 0x30 };
+            
+            foreach (var slotSize in slotSizes)
+            {
+                results.Clear();
+                var slotsStart = slotsArrayPtr + 0x20; // Skip array header
+                int foundCount = 0;
+                
+                for (int i = 0; i < slotsArrayLength && i < 100; i++)
+                {
+                    try
+                    {
+                        var slotAddr = slotsStart + (ulong)(i * slotSize);
+                        var hashCode = Memory.ReadValue<int>(slotAddr);
+                        
+                        // In .NET HashSet, hashCode >= 0 means slot is used
+                        if (hashCode < 0)
+                            continue;
+                        
+                        // MongoID._stringId is at offset 0x10 within MongoID
+                        // MongoID starts at slot offset 0x08
+                        var mongoIdOffset = slotAddr + 0x08;
+                        var stringIdPtr = Memory.ReadPtr(mongoIdOffset + 0x10);
+                        
+                        if (stringIdPtr != 0 && stringIdPtr > 0x10000)
+                        {
+                            var conditionId = Memory.ReadUnicodeString(stringIdPtr, 64, true);
+                            if (!string.IsNullOrEmpty(conditionId) && conditionId.Length >= 10 && conditionId.Length <= 50)
+                            {
+                                results.Add(conditionId);
+                                foundCount++;
+                                DebugLogger.LogDebug($"[QuestManager] Found completed condition: {conditionId}");
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Skip invalid slots
+                    }
+                }
+                
+                // If we found the expected number of items, we have the right slot size
+                if (foundCount > 0 && foundCount >= count / 2)
+                {
+                    DebugLogger.LogDebug($"[QuestManager] Successfully read {foundCount} completed conditions with slot size {slotSize:X}");
+                    return;
+                }
+            }
+            
+            // Fallback: try using UnityHashSet but log the failure
+            DebugLogger.LogDebug("[QuestManager] Manual HashSet reading failed, results may be incomplete");
+        }
+        
+        /// <summary>
         /// Read TaskConditionCounters from Profile.
-        /// Profile.TaskConditionCounters is Dictionary<MongoID, TaskConditionCounter> at offset 0x90
+        /// On first call, caches the counter pointers.
+        /// On subsequent calls, re-initializes if needed or just reads current values.
         /// </summary>
         private void ReadConditionCountersFromProfile()
         {
             try
             {
-                var countersPtr = Memory.ReadPtr(_profile + Offsets.Profile.TaskConditionCounters);
-                if (countersPtr == 0)
+                // Check if dictionary count has changed - if so, reinitialize
+                var countersPtr = Memory.ReadPtr(_profile + Offsets.Profile.TaskConditionCounters, false);
+                if (countersPtr != 0)
                 {
-                    DebugLogger.LogDebug("[QuestManager] TaskConditionCounters pointer is null");
-                    return;
-                }
-
-                // Unity/Mono Dictionary<TKey, TValue> layout:
-                // +0x10 = buckets array
-                // +0x18 = entries array  
-                // +0x20 = count (but we need freeCount subtracted)
-                // +0x28 = freeList
-                // +0x2C = freeCount
-                // +0x30 = version
-                // Actual count = entries count from array
-                
-                var entriesPtr = Memory.ReadPtr(countersPtr + 0x18);
-                if (entriesPtr == 0)
-                {
-                    DebugLogger.LogDebug("[QuestManager] Entries pointer is null");
-                    return;
-                }
-                
-                // Read array length from entries array header (+0x18 in managed array)
-                var arrayLength = Memory.ReadValue<int>(entriesPtr + 0x18);
-                
-                if (arrayLength <= 0 || arrayLength > 500)
-                {
-                    DebugLogger.LogDebug($"[QuestManager] Invalid array length: {arrayLength}");
-                    return;
-                }
-                
-                _conditionCounters.Clear();
-                int foundCounters = 0;
-                
-                // Dictionary entry structure for Dictionary<MongoID, TaskConditionCounter>:
-                // struct Entry {
-                //     int hashCode;      // +0x00 (4 bytes)
-                //     int next;          // +0x04 (4 bytes)
-                //     MongoID key;       // +0x08 (0x18 bytes = 24 bytes)
-                //     TaskConditionCounter value; // +0x20 (8 bytes pointer)
-                // }
-                // Total entry size = 0x28 (40 bytes)
-                
-                const int entrySize = 0x28;
-                const int hashCodeOffset = 0x00;
-                const int keyOffset = 0x08;
-                const int valueOffset = 0x20;
-                
-                // Entries array starts at +0x20 (after array header)
-                var entriesStart = entriesPtr + 0x20;
-                
-                for (int i = 0; i < arrayLength && i < 300; i++)
-                {
-                    try
+                    var countPtr = countersPtr + 0x40; // Dictionary _count field
+                    var currentCount = Memory.ReadValue<int>(countPtr, false);
+                    
+                    // If count changed, we need to reinitialize to pick up new counters
+                    if (_countersInitialized && currentCount != _counterPointers.Count)
                     {
-                        var entryAddr = entriesStart + (uint)(i * entrySize);
-                        
-                        // Check if entry is valid (hashCode >= 0 means it's used)
-                        var hashCode = Memory.ReadValue<int>(entryAddr + hashCodeOffset);
-                        if (hashCode < 0)
-                            continue; // Empty slot
-                        
-                        // Read MongoID key
-                        var mongoId = Memory.ReadValue<MongoID>(entryAddr + keyOffset);
-                        var conditionId = mongoId.ReadString();
-                        
-                        if (string.IsNullOrEmpty(conditionId))
-                            continue;
-                        
-                        // Read TaskConditionCounter pointer
-                        var counterPtr = Memory.ReadPtr(entryAddr + valueOffset);
-                        if (counterPtr == 0)
-                            continue;
-                        
-                        // Read Value (int at offset 0x40 in TaskConditionCounter)
-                        var value = Memory.ReadValue<int>(counterPtr + Offsets.TaskConditionCounter.Value);
-                        
-                        if (value >= 0 && value < 10000) // Sanity check
-                        {
-                            _conditionCounters[conditionId] = value;
-                            foundCounters++;
-                        }
-                    }
-                    catch
-                    {
-                        // Skip invalid entries
+                        DebugLogger.LogDebug($"[QuestManager] Counter count changed ({_counterPointers.Count} -> {currentCount}), reinitializing...");
+                        _countersInitialized = false;
                     }
                 }
                 
-                if (foundCounters > 0)
+                // If we have cached pointers and count hasn't changed, just refresh values
+                if (_countersInitialized && _counterPointers.Count > 0)
                 {
-                    DebugLogger.LogDebug($"[QuestManager] Found {foundCounters} condition counters");
+                    RefreshCounterValuesFromCache();
+                    return;
                 }
+                
+                // First time or count changed - need to discover all counter pointers
+                InitializeCounterPointers();
             }
             catch (Exception ex)
             {
                 DebugLogger.LogDebug($"[QuestManager] Error reading condition counters: {ex.Message}");
             }
         }
+        
+        /// <summary>
+        /// Refresh counter values from cached pointers (fast path).
+        /// </summary>
+        private void RefreshCounterValuesFromCache()
+        {
+            _conditionCounters.Clear();
+            int refreshedCount = 0;
+            
+            foreach (var kvp in _counterPointers)
+            {
+                try
+                {
+                    var conditionId = kvp.Key;
+                    var (counterPtr, targetValue) = kvp.Value;
+                    
+                    // Read current Value (int at offset 0x40 in TaskConditionCounter) - ALWAYS fresh
+                    var currentValue = Memory.ReadValue<int>(counterPtr + Offsets.TaskConditionCounter.Value, false);
+                    
+                    if (currentValue >= 0 && currentValue < 10000)
+                    {
+                        _conditionCounters[conditionId] = (currentValue, targetValue);
+                        refreshedCount++;
+                    }
+                }
+                catch
+                {
+                    // Counter may have become invalid - skip for now
+                }
+            }
+            
+            if (refreshedCount > 0)
+            {
+                DebugLogger.LogDebug($"[QuestManager] Refreshed {refreshedCount} counter values from cache");
+            }
+        }
+        
+        /// <summary>
+        /// Initialize counter pointers by reading the dictionary structure.
+        /// </summary>
+        private void InitializeCounterPointers()
+        {
+            var countersPtr = Memory.ReadPtr(_profile + Offsets.Profile.TaskConditionCounters, false);
+            if (countersPtr == 0)
+            {
+                DebugLogger.LogDebug("[QuestManager] TaskConditionCounters pointer is null");
+                return;
+            }
 
+            var entriesPtr = Memory.ReadPtr(countersPtr + 0x18, false);
+            if (entriesPtr == 0)
+            {
+                DebugLogger.LogDebug("[QuestManager] Entries array pointer is null");
+                return;
+            }
+            
+            var arrayLength = Memory.ReadValue<int>(entriesPtr + 0x18, false);
+            
+            if (arrayLength <= 0 || arrayLength > 500)
+            {
+                DebugLogger.LogDebug($"[QuestManager] Invalid array length: {arrayLength}");
+                return;
+            }
+            
+            _counterPointers.Clear();
+            _conditionCounters.Clear();
+            int foundCounters = 0;
+            
+            const int entrySize = 0x28;
+            const int hashCodeOffset = 0x00;
+            const int keyOffset = 0x08;
+            const int valueOffset = 0x20;
+            
+            var entriesStart = entriesPtr + 0x20;
+            
+            for (int i = 0; i < arrayLength && i < 300; i++)
+            {
+                try
+                {
+                    var entryAddr = entriesStart + (uint)(i * entrySize);
+                    
+                    var hashCode = Memory.ReadValue<int>(entryAddr + hashCodeOffset, false);
+                    if (hashCode < 0)
+                        continue;
+                    
+                    var mongoId = Memory.ReadValue<MongoID>(entryAddr + keyOffset, false);
+                    var conditionId = mongoId.ReadString(128, false);
+                    
+                    if (string.IsNullOrEmpty(conditionId))
+                        continue;
+                    
+                    var counterPtr = Memory.ReadPtr(entryAddr + valueOffset, false);
+                    if (counterPtr == 0)
+                        continue;
+                    
+                    // Read current Value
+                    var currentValue = Memory.ReadValue<int>(counterPtr + Offsets.TaskConditionCounter.Value, false);
+                    
+                    // Read target Value from Template
+                    int targetValue = 0;
+                    try
+                    {
+                        var templatePtr = Memory.ReadPtr(counterPtr + Offsets.TaskConditionCounter.Template, false);
+                        if (templatePtr != 0)
+                        {
+                            var floatValue = Memory.ReadValue<float>(templatePtr + Offsets.Condition.Value, false);
+                            targetValue = (int)floatValue;
+                            
+                            if (targetValue < 0 || targetValue > 10000)
+                                targetValue = 0;
+                        }
+                    }
+                    catch
+                    {
+                        targetValue = 0;
+                    }
+                    
+                    if (currentValue >= 0 && currentValue < 10000)
+                    {
+                        // Cache the pointer and target for future fast reads
+                        _counterPointers[conditionId] = (counterPtr, targetValue);
+                        _conditionCounters[conditionId] = (currentValue, targetValue);
+                        foundCounters++;
+                        
+                        if (foundCounters <= 5)
+                        {
+                            DebugLogger.LogDebug($"[QuestManager] Counter initialized: {conditionId} = {currentValue}/{targetValue}");
+                        }
+                    }
+                }
+                catch
+                {
+                    // Skip invalid entries
+                }
+            }
+            
+            if (foundCounters > 0)
+            {
+                _countersInitialized = true;
+                DebugLogger.LogDebug($"[QuestManager] Initialized {foundCounters} counter pointers for fast refresh");
+            }
+        }
+        
         private static readonly FrozenSet<QuestObjectiveType> _skipObjectiveTypes = new HashSet<QuestObjectiveType>
         {
             QuestObjectiveType.BuildWeapon,

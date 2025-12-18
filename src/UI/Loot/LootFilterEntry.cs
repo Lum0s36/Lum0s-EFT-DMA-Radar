@@ -106,6 +106,7 @@ namespace LoneEftDmaRadar.UI.Loot
             set { if (_comment != value) { _comment = value; OnPropertyChanged(); } }
         }
 
+#nullable enable
         private string? _color = null;
         /// <summary>
         /// Hex value of the rgba color.
@@ -154,6 +155,7 @@ namespace LoneEftDmaRadar.UI.Loot
                 }
             }
         }
+#nullable restore
 
         public event PropertyChangedEventHandler PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string propName = null)

@@ -108,6 +108,13 @@ namespace LoneEftDmaRadar
                     App.Config.LootInfoWidget.Location = lootInfoWidget.Rectangle;
                     App.Config.LootInfoWidget.Minimized = lootInfoWidget.Minimized;
                 }
+                if (Radar?.ViewModel?.QuestHelperWidget is QuestHelperWidget questHelperWidget)
+                {
+                    App.Config.QuestHelper.WidgetLocation = questHelperWidget.Rectangle;
+                    App.Config.QuestHelper.WidgetMinimized = questHelperWidget.Minimized;
+                }
+
+                App.Config.Save(); // Save config before closing
 
                 Memory.Dispose(); // Close FPGA
             }
@@ -159,7 +166,8 @@ namespace LoneEftDmaRadar
                 bool anyWidgetFocused = 
                     (Radar?.ViewModel?.AimviewWidget?.IsFocused ?? false) ||
                     (Radar?.ViewModel?.InfoWidget?.IsFocused ?? false) ||
-                    (Radar?.ViewModel?.LootInfoWidget?.IsFocused ?? false);
+                    (Radar?.ViewModel?.LootInfoWidget?.IsFocused ?? false) ||
+                    (Radar?.ViewModel?.QuestHelperWidget?.IsFocused ?? false);
 
                 if (anyWidgetFocused)
                 {

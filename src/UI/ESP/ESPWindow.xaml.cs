@@ -315,26 +315,64 @@ namespace LoneEftDmaRadar.UI.ESP
 
                         // Render Exfils - ALWAYS rendered regardless of distance settings
                         // They are important navigation points and should never be hidden by distance sliders
+                        // Exfil Status Tracking: Credit to Keegi
                         if (Exits is not null && App.Config.UI.EspExfils)
                         {
                             foreach (var exit in Exits)
                             {
+                                // Handle regular Exfils with status tracking (Credit: Keegi)
                                 if (exit is Exfil exfil)
                                 {
-                                     if (WorldToScreen2WithScale(exfil.Position, out var screen, out float scale, screenWidth, screenHeight))
-                                     {
-                                         float distance = Vector3.Distance(localPlayer.Position, exfil.Position);
-                                         var dotColor = ToColor(SKPaints.PaintExfilOpen);
-                                         var textColor = GetExfilColorForRender();
+                                    // Skip closed exfils
+                                    if (exfil.Status == Exfil.EStatus.Closed)
+                                        continue;
 
-                                         // AIMVIEW SCALING: Scale radius with perspective (includes UIScale)
-                                         float radius = Math.Clamp(3f * App.Config.UI.UIScale * scale, 2f, 15f);
-                                         ctx.DrawCircle(ToRaw(screen), radius, dotColor, true);
-                                         
-                                         // AIMVIEW SCALING: Scale text with perspective
-                                         DxTextSize textSize = scale > 1.5f ? DxTextSize.Medium : DxTextSize.Small;
-                                         ctx.DrawText($"{exfil.Name} D:{distance:F0}m", screen.X + radius + 3, screen.Y + 4, textColor, textSize);
-                                     }
+                                    if (WorldToScreen2WithScale(exfil.Position, out var screen, out float scale, screenWidth, screenHeight))
+                                    {
+                                        float distance = Vector3.Distance(localPlayer.Position, exfil.Position);
+                                        
+                                        // Status-based color selection (Credit: Keegi)
+                                        var dotColor = exfil.Status switch
+                                        {
+                                            Exfil.EStatus.Open => ToColor(SKPaints.PaintExfilOpen),
+                                            Exfil.EStatus.Pending => ToColor(SKPaints.PaintExfilPending),
+                                            _ => ToColor(SKPaints.PaintExfilOpen)
+                                        };
+                                        var textColor = GetExfilColorForRender();
+
+                                        // Status text for label
+                                        var statusText = exfil.Status switch
+                                        {
+                                            Exfil.EStatus.Open => "",
+                                            Exfil.EStatus.Pending => " [Pending]",
+                                            _ => ""
+                                        };
+
+                                        // AIMVIEW SCALING: Scale radius with perspective (includes UIScale)
+                                        float radius = Math.Clamp(3f * App.Config.UI.UIScale * scale, 2f, 15f);
+                                        ctx.DrawCircle(ToRaw(screen), radius, dotColor, true);
+                                        
+                                        // AIMVIEW SCALING: Scale text with perspective
+                                        DxTextSize textSize = scale > 1.5f ? DxTextSize.Medium : DxTextSize.Small;
+                                        ctx.DrawText($"{exfil.Name}{statusText} D:{distance:F0}m", screen.X + radius + 3, screen.Y + 4, textColor, textSize);
+                                    }
+                                }
+                                // Handle TransitPoints (no status tracking - always shown as orange)
+                                else if (exit is TransitPoint transit)
+                                {
+                                    if (WorldToScreen2WithScale(transit.Position, out var screen, out float scale, screenWidth, screenHeight))
+                                    {
+                                        float distance = Vector3.Distance(localPlayer.Position, transit.Position);
+                                        var dotColor = ToColor(SKPaints.PaintExfilTransit);
+
+                                        // AIMVIEW SCALING: Scale radius with perspective (includes UIScale)
+                                        float radius = Math.Clamp(3f * App.Config.UI.UIScale * scale, 2f, 15f);
+                                        ctx.DrawCircle(ToRaw(screen), radius, dotColor, true);
+                                        
+                                        // AIMVIEW SCALING: Scale text with perspective
+                                        DxTextSize textSize = scale > 1.5f ? DxTextSize.Medium : DxTextSize.Small;
+                                        ctx.DrawText($"{transit.Description} [Transit] D:{distance:F0}m", screen.X + radius + 3, screen.Y + 4, dotColor, textSize);
+                                    }
                                 }
                             }
                         }
@@ -436,7 +474,7 @@ namespace LoneEftDmaRadar.UI.ESP
             // Wishlist has higher priority than Filter items
             
             // Always check Quest, Corpse, and Wishlist first (these take priority)
-            if (ShouldShowQuestItem(isQuest) || ShouldShowCorpse(isCorpse) || ShouldShowWishlistItem(item))
+            if (ShouldShowQuestItem(isQuest, item) || ShouldShowCorpse(isCorpse) || ShouldShowWishlistItem(item))
                 return true;
 
             // Check Filter items (they have higher priority than Meds/Food/Regular loot/Backpack)
@@ -453,10 +491,19 @@ namespace LoneEftDmaRadar.UI.ESP
 
         /// <summary>
         /// Checks if quest items should be displayed.
+        /// Only shows quest items that are needed for the player's active quests.
         /// </summary>
-        private bool ShouldShowQuestItem(bool isQuest)
+        private bool ShouldShowQuestItem(bool isQuest, LootItem item)
         {
-            return isQuest && App.Config.UI.EspQuestLoot;
+            if (!isQuest || !App.Config.UI.EspQuestLoot)
+                return false;
+            
+            // Check if this quest item is for one of the player's active quests
+            var questManager = Memory.Game?.QuestManager;
+            if (questManager == null)
+                return true; // Fallback: show all quest items if no quest manager
+            
+            return questManager.IsQuestItem(item.ID);
         }
 
         /// <summary>
@@ -868,19 +915,16 @@ namespace LoneEftDmaRadar.UI.ESP
                     var head = headBone.Position;
                     if (head != Vector3.Zero && !float.IsNaN(head.X) && !float.IsNaN(head.Y) && !float.IsNaN(head.Z) && !float.IsInfinity(head.X) && !float.IsInfinity(head.Y) && !float.IsInfinity(head.Z))
                     {
-                        if (TryProject(head, screenWidth, screenHeight, out var headScreen))
-                        {
-                            var headTop = head;
-                            headTop.Y += 0.18f;
+                        var headTop = head;
+                        headTop.Y += 0.18f;
 
-                            if (TryProject(headTop, screenWidth, screenHeight, out var headTopScreen))
-                            {
-                                var dy = MathF.Abs(headTopScreen.Y - headScreen.Y);
-                                float radius = dy * 0.65f;
-                                radius = Math.Clamp(radius, 2f, 12f);
-                                
-                                ctx.DrawCircle(ToRaw(headScreen), radius, color, filled: false);
-                            }
+                        if (TryProject(headTop, screenWidth, screenHeight, out var headTopScreen))
+                        {
+                            var dy = MathF.Abs(headTopScreen.Y - headScreen.Y);
+                            float radius = dy * 0.65f;
+                            radius = Math.Clamp(radius, 2f, 12f);
+                            
+                            ctx.DrawCircle(ToRaw(headScreen), radius, color, filled: false);
                         }
                     }
                 }
@@ -1283,32 +1327,24 @@ namespace LoneEftDmaRadar.UI.ESP
                     continue;
 
                 bool shouldShow = false;
-                string reason = "";
 
                 if (App.Config.UI.EspLootFilterOnly)
                 {
                     if (isInFilter)
                     {
                         shouldShow = true;
-                        reason = "IN_FILTER";
                         if (isInFilter) shownInFilter++;
                     }
                     else if (App.Config.UI.EspShowWishlisted && isWishlisted)
                     {
                         shouldShow = true;
-                        reason = "WISHLIST";
                         shownWishlist++;
-                    }
-                    else
-                    {
-                        reason = "NOT_IN_FILTER";
                     }
                 }
                 else if (App.Config.UI.EspShowWishlisted && isWishlisted)
                 {
                     // Wishlist items have higher priority than other categories
                     shouldShow = true;
-                    reason = "WISHLIST";
                     shownWishlist++;
                 }
                 else if (isMeds)
@@ -1317,19 +1353,13 @@ namespace LoneEftDmaRadar.UI.ESP
                     if (App.Config.UI.EspShowWishlisted && isWishlisted)
                     {
                         shouldShow = true;
-                        reason = "WISHLIST_MEDS";
                         shownMeds++;
                         shownWishlist++;
                     }
                     else if (App.Config.UI.EspMeds)
                     {
                         shouldShow = true;
-                        reason = "MEDS_ON";
                         shownMeds++;
-                    }
-                    else
-                    {
-                        reason = "MEDS_OFF";
                     }
                 }
                 else if (isFood)
@@ -1338,19 +1368,13 @@ namespace LoneEftDmaRadar.UI.ESP
                     if (App.Config.UI.EspShowWishlisted && isWishlisted)
                     {
                         shouldShow = true;
-                        reason = "WISHLIST_FOOD";
                         shownFood++;
                         shownWishlist++;
                     }
                     else if (App.Config.UI.EspFood)
                     {
                         shouldShow = true;
-                        reason = "FOOD_ON";
                         shownFood++;
-                    }
-                    else
-                    {
-                        reason = "FOOD_OFF";
                     }
                 }
                 else if (App.Config.UI.EspLoot)
@@ -1359,22 +1383,8 @@ namespace LoneEftDmaRadar.UI.ESP
                     if (!isInFilter && !isWishlisted && (item.IsRegularLoot || item.IsValuableLoot))
                     {
                         shouldShow = true;
-                        reason = "LOOT_ON";
                         shownRegular++;
                     }
-                    else if (isInFilter || isWishlisted)
-                    {
-                        // Items in filter or wishlist should NOT show in EspLoot
-                        reason = "FILTER/WISHLIST_EXCLUDED_FROM_LOOT";
-                    }
-                    else
-                    {
-                        reason = "BELOW_MIN_VALUE";
-                    }
-                }
-                else
-                {
-                    reason = "ALL_OFF";
                 }
 
                 if (shouldShow)
@@ -1987,7 +1997,7 @@ namespace LoneEftDmaRadar.UI.ESP
             double width = App.Config.UI.EspScreenWidth > 0
                 ? App.Config.UI.EspScreenWidth
                 : monitor?.Width ?? SystemParameters.PrimaryScreenWidth;
-            double height = App.Config.UI.EspScreenHeight > 0
+            double height = App Config.UI.EspScreenHeight > 0
                 ? App.Config.UI.EspScreenHeight
                 : monitor?.Height ?? SystemParameters.PrimaryScreenHeight;
             return (width, height);

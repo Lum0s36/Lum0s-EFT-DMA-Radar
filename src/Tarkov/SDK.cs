@@ -14,6 +14,30 @@ namespace SDK
             public const uint MainPlayer = 0x1E8; // EFT.Player
             public const uint SynchronizableObjectLogicProcessor = 0x220; // EFT.SynchronizableObjects.SynchronizableObjectLogicProcessor
             public const uint Grenades = 0x260; // DictionaryListHydra<int, Throwable>
+            public const uint ExfiltrationController = 0x48; // EFT.Interactive.ExfiltrationController
+        }
+
+        public readonly partial struct ExfiltrationController
+        {
+            public const uint SecretExfilitrationController = 0x18; // EFT.Interactive.SecretExfiltrations.SecretExfilitranionController
+            public const uint ExfiltrationPoints = 0x20; // EFT.Interactive.ExfiltrationPoint[]
+            public const uint ScavExfiltrationPoints = 0x28; // EFT.Interactive.ScavExfiltrationPoint[]
+            public const uint SecretExfiltrationPoints = 0x30; // EFT.Interactive.SecretExfiltrations.SecretExfiltrationPoint[]
+        }
+
+        public readonly partial struct ExfiltrationPoint
+        {
+            public const uint _status = 0x58; // EFT.Interactive.EExfiltrationStatus
+            public const uint Settings = 0x98; // EFT.Interactive.ExitTriggerSettings
+            public const uint EligibleEntryPoints = 0xC0; // string[]
+            public const uint EligibleIds = 0xF8; // System.Collections.Generic.List<string>
+        }
+
+        public readonly partial struct ExitTriggerSettings
+        {
+            public const uint Id = 0x10; // string
+            public const uint Name = 0x18; // string
+            public const uint EntryPoints = 0x40; // string
         }
 
         public readonly partial struct SynchronizableObject
@@ -374,6 +398,22 @@ namespace SDK
             public const uint Value = 0x40; // Int32 - The current progress count
             public const uint Template = 0x48; // Condition
             public const uint Conditional = 0x50; // IConditional
+        }
+
+        public readonly partial struct Condition // EFT.Quests.Condition
+        {
+            public const uint Id = 0x10; // MongoID
+            public const uint Value = 0x28; // Single (float) - The target count
+            public const uint CompareMethod = 0x2C; // ECompareMethod (Int32)
+            public const uint VisibilityConditions = 0x30; // Condition[]
+            public const uint Index = 0x38; // Int32
+            public const uint ParentId = 0x40; // Nullable<MongoID>
+            public const uint DynamicLocale = 0x60; // Boolean
+            public const uint IsNecessary = 0x61; // Boolean
+            public const uint Identity = 0x64; // Int32
+            public const uint ChildConditions = 0x68; // UpdatableBindableList<Condition>
+            public const uint ResetOnSessionEnd = 0x70; // Boolean
+            public const uint QuestNoteId = 0x78; // Nullable<MongoID>
         }
 
         public readonly partial struct TriggerWithId // EFT.Interactive.TriggerWithId

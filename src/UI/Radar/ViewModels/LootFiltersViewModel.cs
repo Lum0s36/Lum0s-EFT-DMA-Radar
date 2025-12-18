@@ -1171,9 +1171,11 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
             OnPropertyChanged(nameof(EntryCountText));
         }
 
+#nullable enable
         // Cache for matching items when searching (to avoid repeated calculations)
         private List<LootFilterEntry>? _cachedMatchingEntries = null;
         private string? _cachedSearchText = null;
+#nullable restore
 
         private bool EntryFilterPredicate(object obj)
         {
@@ -1294,6 +1296,7 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
 
     #region Export/Import Data Structures
 
+#nullable enable
     /// <summary>
     /// Stable export format for Loot Filters (does not use ConcurrentDictionary)
     /// Supports both old format (array) and new format (object with lootFilters wrapper)
@@ -1393,7 +1396,7 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
             }
             else if (reader.TokenType == JsonTokenType.String)
             {
-                string value = reader.GetString() ?? "ImportantLoot";
+                string? value = reader.GetString() ?? "ImportantLoot";
                 return Enum.TryParse<LootFilterEntryType>(value, true, out var result) 
                     ? result 
                     : LootFilterEntryType.ImportantLoot;
@@ -1406,6 +1409,7 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
             writer.WriteNumberValue((int)value);
         }
     }
+#nullable restore
 
     #endregion
 }

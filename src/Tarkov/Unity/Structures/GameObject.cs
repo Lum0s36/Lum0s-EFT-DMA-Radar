@@ -25,20 +25,8 @@
         /// <returns>Requested component class.</returns>
         public ulong GetComponent(string className)
         {
-            throw new NotImplementedException("TODO");
-            // component list
-            var componentArr = Memory.ReadValue<DynamicArray>(Components);
-            int size = componentArr.Size <= 0x1000 ?
-                (int)componentArr.Size : 0x1000;
-            using var compsBuf = Memory.ReadArray<DynamicArray.Entry>(0x0, size); // TODO: componentArr.ArrayBase
-            foreach (var comp in compsBuf)
-            {
-                var compClass = Memory.ReadPtr(comp.Component + UnitySDK.UnityOffsets.Component_ObjectClassOffset);
-                var name = Structures.ObjectClass.ReadName(compClass);
-                if (name.Equals(className, StringComparison.OrdinalIgnoreCase))
-                    return compClass;
-            }
-            throw new InvalidOperationException("Component Not Found!");
+            // TODO: Implement component retrieval when needed
+            throw new NotImplementedException("GetComponent not yet implemented");
         }
     }
 }

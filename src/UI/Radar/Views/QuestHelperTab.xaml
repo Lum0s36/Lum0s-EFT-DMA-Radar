@@ -55,8 +55,13 @@
                         
                         <CheckBox Content="Show Widget on Radar"
                                   IsChecked="{Binding ShowWidget, Mode=TwoWay}"
-                                  VerticalAlignment="Center" Margin="0,0,0,4"
+                                  VerticalAlignment="Center" Margin="0,0,20,4"
                                   ToolTip="Shows a widget on the radar displaying tracked quests and their objectives for the current map." />
+                        
+                        <CheckBox Content="Show Quest Items"
+                                  IsChecked="{Binding ShowQuestItems, Mode=TwoWay}"
+                                  VerticalAlignment="Center" Margin="0,0,0,4"
+                                  ToolTip="Shows quest items (like Bronze Pocket Watch, Jaeger's Letter, etc.) on Radar and ESP." />
                     </WrapPanel>
                 </StackPanel>
             </GroupBox>

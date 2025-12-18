@@ -75,11 +75,15 @@ namespace LoneEftDmaRadar.UI.Misc
         private int _dbgWithinDistance;
         private int _dbgHaveSkeleton;
         private int _dbgW2SPassed;
+        
+        // Reserved for future no-recoil caching (currently managed by NoRecoil feature)
+#pragma warning disable CS0169, CS0414 // Fields are reserved for future use
         private ulong _cachedBreathEffector;
         private ulong _cachedShotEffector;
         private ulong _cachedNewShotRecoil;
         private float _lastRecoilAmount = 1.0f;
         private float _lastSwayAmount = 1.0f;
+#pragma warning restore CS0169, CS0414
         
         private readonly List<string> _debugLines = new List<string>(64);
         #endregion

@@ -78,9 +78,8 @@ namespace LoneEftDmaRadar.Tarkov.Features.MemWrites
                     //DebugLogger.LogDebug("[InfiniteStamina] Enabled");
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                //DebugLogger.LogDebug($"[InfiniteStamina] Error in TryApply: {ex}");
                 ClearCache();
             }
         }

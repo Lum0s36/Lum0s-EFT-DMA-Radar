@@ -1,4 +1,5 @@
-﻿using LoneEftDmaRadar.Tarkov.Unity.Collections;
+﻿using LoneEftDmaRadar.DMA;
+using LoneEftDmaRadar.Tarkov.Unity.Collections;
 using LoneEftDmaRadar.UI.Misc;
 using LoneEftDmaRadar.Web.TarkovDev.Data;
 using System.Collections.Frozen;
@@ -80,11 +81,31 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player.Helpers
                     {
                         continue; // skip pmc scabbard
                     }
-                    var containedItem = Memory.ReadPtr(slot.Value + Offsets.Slot.ContainedItem);
-                    var inventorytemplate = Memory.ReadPtr(containedItem + Offsets.LootItem.Template);
-                    var mongoId = Memory.ReadValue<MongoID>(inventorytemplate + Offsets.ItemTemplate._id);
+                    
+                    // Read the ContainedItem pointer directly as ulong first
+                    // If it's 0 or invalid, the slot is empty
+                    var containedItemPtr = Memory.ReadValue<ulong>(slot.Value + Offsets.Slot.ContainedItem, false);
+                    
+                    // Check if slot is empty (null pointer)
+                    if (containedItemPtr == 0 || !MemDMA.IsValidVirtualAddress(containedItemPtr))
+                    {
+                        // Slot is empty - remove any cached item
+                        _items.TryRemove(slot.Key, out _);
+                        continue;
+                    }
+                    
+                    // Read template from contained item
+                    var inventoryTemplatePtr = Memory.ReadValue<ulong>(containedItemPtr + Offsets.LootItem.Template, false);
+                    if (inventoryTemplatePtr == 0 || !MemDMA.IsValidVirtualAddress(inventoryTemplatePtr))
+                    {
+                        _items.TryRemove(slot.Key, out _);
+                        continue;
+                    }
+                    
+                    var mongoId = Memory.ReadValue<MongoID>(inventoryTemplatePtr + Offsets.ItemTemplate._id, false);
                     var id = mongoId.ReadString();
-                    if (TarkovDataManager.AllItems.TryGetValue(id, out var item))
+                    
+                    if (!string.IsNullOrEmpty(id) && TarkovDataManager.AllItems.TryGetValue(id, out var item))
                     {
                         _items[slot.Key] = item;
                     }
@@ -99,6 +120,5 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player.Helpers
                 }
             }
         }
-
     }
 }

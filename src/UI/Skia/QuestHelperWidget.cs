@@ -2,6 +2,8 @@
  * Lone EFT DMA Radar
  * Quest Helper Widget
  * 
+ * Quest Helper: Credit to LONE for the foundational implementation
+ * 
  * Displays tracked, active quests for the current map with their objectives.
  */
 
@@ -39,7 +41,7 @@ namespace LoneEftDmaRadar.UI.Skia
         private float _scrollOffset = 0f;
         private float _maxScrollOffset = 0f;
         private DateTime _lastRefresh = DateTime.MinValue;
-        private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(2);
+        private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(1); // Faster refresh for live updates
 
         #endregion
 
@@ -120,7 +122,7 @@ namespace LoneEftDmaRadar.UI.Skia
         /// <summary>
         /// Draw the quest helper widget.
         /// </summary>
-        public void Draw(SKCanvas canvas)
+        public new void Draw(SKCanvas canvas)
         {
             if (Minimized)
             {
@@ -177,10 +179,30 @@ namespace LoneEftDmaRadar.UI.Skia
             if (questManager == null)
                 return;
 
-            // Process active quests that are not blacklisted
+            // Get tracked quests from config
+            var trackedQuests = config.TrackedQuests;
+            bool hasTrackedQuests = trackedQuests != null && trackedQuests.Count > 0;
+
+            // Process active quests that are tracked
             foreach (var questEntry in questManager.Quests.Values)
             {
-                // Skip if blacklisted
+                // Only show quests that are explicitly tracked
+                // If no quests are tracked, show nothing (user must select quests to track)
+                if (hasTrackedQuests)
+                {
+                    // Only show if quest is in the tracked list
+                    // trackedQuests is guaranteed non-null here due to hasTrackedQuests check
+                    if (trackedQuests is null || !trackedQuests.Contains(questEntry.Id))
+                        continue;
+                }
+                else
+                {
+                    // If no quests are tracked yet, skip showing any
+                    // User must go to Quest Helper tab and select quests to track
+                    continue;
+                }
+
+                // Skip if blacklisted (user explicitly disabled this quest)
                 if (config.BlacklistedQuests.ContainsKey(questEntry.Id))
                     continue;
 
@@ -330,11 +352,22 @@ namespace LoneEftDmaRadar.UI.Skia
                     var isCompleted = quest.IsObjectiveCompleted(obj.Id);
                     var currentCount = quest.GetObjectiveProgress(obj.Id);
                     
+                    // Get target count from memory, fallback to API value
+                    var targetCount = quest.GetObjectiveTargetCount(obj.Id);
+                    if (targetCount <= 0)
+                        targetCount = obj.Count; // Fallback to API value
+                    
+                    // Auto-complete if currentCount >= target count
+                    if (!isCompleted && targetCount > 0 && currentCount >= targetCount)
+                    {
+                        isCompleted = true;
+                    }
+                    
                     var objEntry = new ObjectiveDisplayEntry
                     {
                         TypeIcon = GetTypeIcon(obj.Type),
                         Description = obj.Description ?? GetDefaultDescription(obj),
-                        Progress = GetProgressText(obj, currentCount, isCompleted),
+                        Progress = GetProgressTextWithTarget(currentCount, targetCount, isCompleted),
                         IsCompleted = isCompleted
                     };
                     
@@ -372,15 +405,19 @@ namespace LoneEftDmaRadar.UI.Skia
                 _ => "Complete objective"
             };
         }
-
-        private static string GetProgressText(TarkovDataManager.TaskElement.ObjectiveElement obj, int currentCount, bool isCompleted)
+        
+        private static string GetProgressTextWithTarget(int currentCount, int targetCount, bool isCompleted)
         {
             if (isCompleted)
                 return "DONE";
             
             // For objectives with count, show currentCount/totalCount
-            if (obj.Count > 0)
-                return $"{currentCount}/{obj.Count}";
+            if (targetCount > 0)
+                return $"{currentCount}/{targetCount}";
+            
+            // Show current count if we have one but no target
+            if (currentCount > 0)
+                return $"{currentCount}/?";
             
             return "";
         }
@@ -390,9 +427,19 @@ namespace LoneEftDmaRadar.UI.Skia
             var font = SKFonts.InfoWidgetFont;
             float pad = 5f * ScaleFactor;
 
-            string message = Memory.InRaid 
-                ? "No tracked quests for this map" 
-                : "Enter raid to see quests";
+            string message;
+            if (!Memory.InRaid)
+            {
+                message = "Enter raid to see quests";
+            }
+            else if (App.Config.QuestHelper.TrackedQuests.Count == 0)
+            {
+                message = "No quests tracked - select quests in Quest Helper tab";
+            }
+            else
+            {
+                message = "No tracked quests for this map";
+            }
 
             var textPt = new SKPoint(
                 ClientRectangle.Left + pad,

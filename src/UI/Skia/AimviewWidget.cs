@@ -2,6 +2,8 @@
  * Lone EFT DMA Radar
  * Brought to you by Lone (Lone DMA)
  * 
+ * Exfil Status Tracking: Credit to Keegi
+ * 
 MIT License
 
 Copyright (c) 2025 Lone DMA
@@ -144,24 +146,72 @@ namespace LoneEftDmaRadar.UI.Skia
 
             foreach (var exit in Exits)
             {
-                if (exit is not Exfil exfil)
-                    continue;
-
-                if (TryProject(exfil.Position, out var screen, out float scale, localPlayer))
+                // Handle regular Exfils with status tracking (Credit: Keegi)
+                if (exit is Exfil exfil)
                 {
-                    var paint = SKPaints.PaintExfilOpen;
-                    float distance = Vector3.Distance(localPlayer.Position, exfil.Position);
+                    // Skip closed exfils
+                    if (exfil.Status == Exfil.EStatus.Closed)
+                        continue;
 
-                    // Scale radius with perspective (from TryProject)
-                    float r = Math.Clamp(3f * App.Config.UI.UIScale * scale, 2f, 15f);
+                    if (TryProject(exfil.Position, out var screen, out float scale, localPlayer))
+                    {
+                        // Status-based paint selection (Credit: Keegi)
+                        var paint = exfil.Status switch
+                        {
+                            Exfil.EStatus.Open => SKPaints.PaintExfilOpen,
+                            Exfil.EStatus.Pending => SKPaints.PaintExfilPending,
+                            _ => SKPaints.PaintExfilOpen
+                        };
+                        
+                        float distance = Vector3.Distance(localPlayer.Position, exfil.Position);
 
-                    _canvas.DrawCircle(screen.X, screen.Y, r, paint);
+                        // Scale radius with perspective (from TryProject)
+                        float r = Math.Clamp(3f * App.Config.UI.UIScale * scale, 2f, 15f);
 
-                    // Scale font with perspective
-                    float baseFontSize = SKFonts.EspWidgetFont.Size * scale * 0.9f;
-                    float fontSize = Math.Clamp(baseFontSize, 8f, 20f);
-                    using var font = new SKFont(SKFonts.EspWidgetFont.Typeface, fontSize) { Subpixel = true };
-                    _canvas.DrawText($"{exfil.Name} D:{distance:F0}m", new SKPoint(screen.X + r + 3, screen.Y + r + 1), SKTextAlign.Left, font, SKPaints.TextExfil);
+                        _canvas.DrawCircle(screen.X, screen.Y, r, paint);
+
+                        // Build label with status
+                        var statusText = exfil.Status switch
+                        {
+                            Exfil.EStatus.Open => "",
+                            Exfil.EStatus.Pending => " [Pending]",
+                            _ => ""
+                        };
+
+                        // Scale font with perspective
+                        float baseFontSize = SKFonts.EspWidgetFont.Size * scale * 0.9f;
+                        float fontSize = Math.Clamp(baseFontSize, 8f, 20f);
+                        using var font = new SKFont(SKFonts.EspWidgetFont.Typeface, fontSize) { Subpixel = true };
+                        _canvas.DrawText($"{exfil.Name}{statusText} D:{distance:F0}m", new SKPoint(screen.X + r + 3, screen.Y + r + 1), SKTextAlign.Left, font, SKPaints.TextExfil);
+                    }
+                }
+                // Handle TransitPoints (no status tracking - always shown as orange)
+                else if (exit is TransitPoint transit)
+                {
+                    if (TryProject(transit.Position, out var screen, out float scale, localPlayer))
+                    {
+                        var paint = SKPaints.PaintExfilTransit;
+                        float distance = Vector3.Distance(localPlayer.Position, transit.Position);
+
+                        // Scale radius with perspective (from TryProject)
+                        float r = Math.Clamp(3f * App.Config.UI.UIScale * scale, 2f, 15f);
+
+                        _canvas.DrawCircle(screen.X, screen.Y, r, paint);
+
+                        // Scale font with perspective
+                        float baseFontSize = SKFonts.EspWidgetFont.Size * scale * 0.9f;
+                        float fontSize = Math.Clamp(baseFontSize, 8f, 20f);
+                        using var font = new SKFont(SKFonts.EspWidgetFont.Typeface, fontSize) { Subpixel = true };
+                        
+                        // Use transit-colored text
+                        var textPaint = new SKPaint
+                        {
+                            Color = SKPaints.PaintExfilTransit.Color,
+                            IsStroke = false,
+                            IsAntialias = true
+                        };
+                        _canvas.DrawText($"{transit.Description} [Transit] D:{distance:F0}m", new SKPoint(screen.X + r + 3, screen.Y + r + 1), SKTextAlign.Left, font, textPaint);
+                    }
                 }
             }
         }

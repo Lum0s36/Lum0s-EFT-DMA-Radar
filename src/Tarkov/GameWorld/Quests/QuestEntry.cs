@@ -2,6 +2,8 @@
  * Lone EFT DMA Radar
  * Brought to you by Lone (Lone DMA)
  * 
+ * Quest Helper: Credit to LONE for the foundational implementation
+ * 
 MIT License
 
 Copyright (c) 2025 Lone DMA
@@ -48,9 +50,9 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Quests
         public HashSet<string> CompletedConditions { get; } = new(StringComparer.OrdinalIgnoreCase);
         
         /// <summary>
-        /// Objective progress counters (ObjectiveId -> CurrentCount).
+        /// Objective progress counters (ObjectiveId -> (CurrentCount, TargetCount)).
         /// </summary>
-        public ConcurrentDictionary<string, int> ConditionCounters { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public ConcurrentDictionary<string, (int CurrentCount, int TargetCount)> ConditionCounters { get; } = new(StringComparer.OrdinalIgnoreCase);
         
         private bool _isEnabled;
         public bool IsEnabled
@@ -103,7 +105,18 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Quests
         {
             if (string.IsNullOrEmpty(objectiveId))
                 return 0;
-            return ConditionCounters.TryGetValue(objectiveId, out var count) ? count : 0;
+            return ConditionCounters.TryGetValue(objectiveId, out var count) ? count.CurrentCount : 0;
+        }
+        
+        /// <summary>
+        /// Get the target count for an objective from game memory.
+        /// Returns 0 if not found (fallback to API value should be used).
+        /// </summary>
+        public int GetObjectiveTargetCount(string objectiveId)
+        {
+            if (string.IsNullOrEmpty(objectiveId))
+                return 0;
+            return ConditionCounters.TryGetValue(objectiveId, out var count) ? count.TargetCount : 0;
         }
         
         /// <summary>
@@ -122,7 +135,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Quests
         /// <summary>
         /// Update condition counters from memory.
         /// </summary>
-        internal void UpdateConditionCounters(IEnumerable<KeyValuePair<string, int>> counters)
+        internal void UpdateConditionCounters(IEnumerable<KeyValuePair<string, (int CurrentCount, int TargetCount)>> counters)
         {
             ConditionCounters.Clear();
             foreach (var kvp in counters)

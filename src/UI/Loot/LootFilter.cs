@@ -52,15 +52,29 @@ namespace LoneEftDmaRadar.UI.Loot
             bool showMeds = ShowMeds;
             bool showFood = ShowFood;
             bool showBackpacks = ShowBackpacks;
-            bool showQuestItems = ShowQuestItems;
+            // Always read quest item setting from config (not from static variable)
+            bool showQuestItems = App.Config.Loot.ShowQuestItems;
             bool showWishlisted = App.Config.Loot.ShowWishlistedRadar;
+            
+            // Get the QuestManager to check if quest items are for active quests
+            var questManager = Memory.Game?.QuestManager;
             
             if (usePrices)
             {
                 Predicate<LootItem> p = x => // Default Predicate
                 {
+                    // Quest items: only show if enabled AND for an active quest
                     if (x.IsQuestItem && showQuestItems)
-                        return true;
+                    {
+                        // Check if this quest item is for one of the player's active quests
+                        // If no quest manager, show all quest items (fallback)
+                        if (questManager == null)
+                            return true;
+                        
+                        // Quest items are stored with their BSG ID in the QuestManager.ItemConditions
+                        // The ID in LootItem comes from ItemTemplate._id (BSG ID)
+                        return questManager.IsQuestItem(x.ID);
+                    }
                     // Wishlist items always pass the filter when enabled
                     if (showWishlisted && x.IsWishlisted)
                         return true;
