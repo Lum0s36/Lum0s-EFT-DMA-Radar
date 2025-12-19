@@ -30,10 +30,9 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Camera
 
         private static void MemDMA_ProcessStarting(object sender, EventArgs e) { }
         private static void MemDMA_ProcessStopped(object sender, EventArgs e) { }
-        
-        // Compatibility stub for existing code (PR #6 doesn't track this, always return 1.0)
+
         public static float ScopeMagnification => 1.0f;
-        
+
         public static ulong FPSCameraPtr { get; private set; }
         public static ulong OpticCameraPtr { get; private set; }
         public static ulong ActiveCameraPtr { get; private set; }
@@ -48,8 +47,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Camera
         private static float _aspect;
         private static readonly ViewMatrix _viewMatrix = new();
         public static Vector3 CameraPosition => new(_viewMatrix.M14, _viewMatrix.M24, _viewMatrix.Translation.Z);
-    
-        // Optic camera cache for performance (from commit 7e83931)
+
         private static readonly List<ulong> _potentialOpticCameras = new();
         private static bool _hasSearchedForPotentialCameras = false;
         private static bool _useFpsCameraForCurrentAds = false;
@@ -66,8 +64,6 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Camera
             _potentialOpticCameras.Clear();
             _hasSearchedForPotentialCameras = false;
             _useFpsCameraForCurrentAds = false;
-            
-            // Don't reset viewport to empty - re-initialize with valid resolution
             UpdateViewportRes();
         }
 
@@ -95,13 +91,11 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Camera
                     {
                         width = targetMonitor.Width;
                         height = targetMonitor.Height;
-                        DebugLogger.LogDebug($"[CameraManager] Using target monitor {targetMonitor.Index} resolution: {width}x{height}");
                     }
                     else
                     {
                         width = (int)App.Config.UI.Resolution.Width;
                         height = (int)App.Config.UI.Resolution.Height;
-                        DebugLogger.LogDebug($"[CameraManager] Falling back to game resolution: {width}x{height}");
                     }
                 }
 
@@ -109,15 +103,13 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Camera
                 {
                     width = CameraConstants.DefaultViewportWidth;
                     height = CameraConstants.DefaultViewportHeight;
-                    DebugLogger.LogDebug($"[CameraManager] Invalid resolution, using fallback: {width}x{height}");
                 }
 
                 Viewport = new Rectangle(0, 0, width, height);
-                DebugLogger.LogDebug($"[CameraManager] Viewport updated to {width}x{height}");
             }
         }
 
-        public static bool WorldToScreen(ref readonly Vector3 worldPos, out SKPoint scrPos, bool onScreenCheck = false, bool useTolerance = false) 
+        public static bool WorldToScreen(ref readonly Vector3 worldPos, out SKPoint scrPos, bool onScreenCheck = false, bool useTolerance = false)
         {
             try
             {
@@ -136,7 +128,6 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Camera
                 {
                     float angleRadHalf = (MathF.PI / 180f) * _fov * 0.5f;
                     float angleCtg = MathF.Cos(angleRadHalf) / MathF.Sin(angleRadHalf);
-
                     x /= angleCtg * _aspect * 0.5f;
                     y /= angleCtg * 0.5f;
                 }
@@ -174,8 +165,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Camera
 
         public CameraManager()
         {
-            if (IsInitialized)
-                return;
+            if (IsInitialized) return;
 
             _potentialOpticCameras.Clear();
             _hasSearchedForPotentialCameras = false;
@@ -184,77 +174,38 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Camera
             try
             {
                 DebugLogger.LogDebug("=== CameraManager Initialization ===");
-                
-                // Use signature-based lookup with fallback (from commit 95ec910)
+
                 var allCamerasPtr = AllCameras.GetPtr(Memory.UnityBase);
-                
+
                 if (allCamerasPtr == 0)
-                {
-                    DebugLogger.LogDebug(" CRITICAL: AllCameras pointer is NULL!");
-                    DebugLogger.LogDebug("This means the AllCameras offset is likely wrong.");
                     throw new InvalidOperationException("AllCameras pointer is NULL - offset may be outdated");
-                }
 
                 if (allCamerasPtr > CameraConstants.MaxValidPointer)
-                {
-                    DebugLogger.LogDebug($" CRITICAL: AllCameras pointer is invalid: 0x{allCamerasPtr:X}");
                     throw new InvalidOperationException($"Invalid AllCameras pointer: 0x{allCamerasPtr:X}");
-                }
 
-                // AllCameras is a List<Camera*>
-                // Structure: +0x0 = items array pointer, +0x8 = count (int)
                 var listItemsPtr = Memory.ReadPtr(allCamerasPtr + 0x0, false);
                 var count = Memory.ReadValue<int>(allCamerasPtr + CameraConstants.CameraListCountOffset, false);
 
-                DebugLogger.LogDebug($"\nList Structure:");
-                DebugLogger.LogDebug($"  Items Pointer: 0x{listItemsPtr:X}");
-                DebugLogger.LogDebug($"  Count: {count}");
-
                 if (listItemsPtr == 0)
-                {
-                    DebugLogger.LogDebug(" CRITICAL: List items pointer is NULL!");
                     throw new InvalidOperationException("Camera list items pointer is NULL");
-                }
 
                 if (count <= 0)
-                {
-                    DebugLogger.LogDebug(" CRITICAL: Camera count is 0 or negative!");
-                    DebugLogger.LogDebug("This usually means you're not in a raid yet.");
                     throw new InvalidOperationException($"No cameras in list (count: {count})");
-                }
 
-                if (count > CameraConstants.MaxCameraSearchCount)
-                {
-                    DebugLogger.LogDebug($" WARNING: Camera count seems high: {count}");
-                    DebugLogger.LogDebug("This might indicate memory corruption or wrong structure.");
-                }
-
-                // Only search for FPS camera during initialization (from commit 7e83931)
-                var fps = FindFpsCamera(listItemsPtr, count);
+                var fps = CameraSearch.FindFpsCamera(listItemsPtr, count);
 
                 if (fps == 0)
-                {
-                    DebugLogger.LogDebug("\n CRITICAL: Could not find required FPS Camera!");
                     throw new InvalidOperationException("Could not find required FPS Camera!");
-                }
 
                 FPSCamera = fps;
-
-                DebugLogger.LogDebug("\n=== Getting Matrix Addresses ===");
-                _fpsMatrixAddress = GetMatrixAddress(FPSCamera, "FPS");
+                _fpsMatrixAddress = CameraSearch.GetMatrixAddress(FPSCamera, "FPS");
 
                 FPSCameraPtr = FPSCamera;
                 OpticCameraPtr = 0;
                 ActiveCameraPtr = 0;
                 _opticMatrixAddress = 0;
 
-                DebugLogger.LogDebug($"  FPS Camera: 0x{FPSCamera:X}");
-                DebugLogger.LogDebug($"  GameObject: 0x{Memory.ReadPtr(FPSCamera + UnitySDK.UnityOffsets.Component_GameObjectOffset, false):X}");
-                DebugLogger.LogDebug($"  Matrix Address: 0x{_fpsMatrixAddress:X}");
-
-                VerifyViewMatrix(_fpsMatrixAddress, "FPS");
-
-                _hasSearchedForPotentialCameras = false;
+                CameraSearch.VerifyViewMatrix(_fpsMatrixAddress, "FPS");
 
                 IsInitialized = true;
                 DebugLogger.LogDebug("=== CameraManager Initialization Complete ===\n");
@@ -266,178 +217,14 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Camera
             }
         }
 
-        private static ulong GetMatrixAddress(ulong cameraPtr, string cameraType)
-        {
-            var gameObject = Memory.ReadPtr(cameraPtr + UnitySDK.UnityOffsets.Component_GameObjectOffset, false);
-
-            if (gameObject == 0 || gameObject > CameraConstants.MaxValidPointer)
-                throw new InvalidOperationException($"Invalid {cameraType} GameObject: 0x{gameObject:X}");
-
-            var ptr1 = Memory.ReadPtr(gameObject + UnitySDK.UnityOffsets.GameObject_ComponentsOffset, false);
-
-            if (ptr1 == 0 || ptr1 > CameraConstants.MaxValidPointer)
-                throw new InvalidOperationException($"Invalid {cameraType} Ptr1 (GameObject+UnitySDK.UnityOffsets.GameObject_ComponentsOffset): 0x{ptr1:X}");
-                
-            var matrixAddress = Memory.ReadPtr(ptr1 + CameraConstants.CameraMatrixComponentsOffset, false);
-
-            if (matrixAddress == 0 || matrixAddress > CameraConstants.MaxValidPointer)
-                throw new InvalidOperationException($"Invalid {cameraType} matrixAddress (Ptr1+0x18): 0x{matrixAddress:X}");
-
-            return matrixAddress;
-        }
-
-        private static void VerifyViewMatrix(ulong matrixAddress, string name)
-        {
-            try
-            {
-                DebugLogger.LogDebug($"\n{name} Matrix @ 0x{matrixAddress:X}:");
-                var vm = Memory.ReadValue<Matrix4x4>(matrixAddress + UnitySDK.UnityOffsets.Camera_ViewMatrixOffset, false);
-
-                float rightMag = MathF.Sqrt(vm.M11 * vm.M11 + vm.M12 * vm.M12 + vm.M13 * vm.M13);
-                float upMag = MathF.Sqrt(vm.M21 * vm.M21 + vm.M22 * vm.M22 + vm.M23 * vm.M23);
-                float fwdMag = MathF.Sqrt(vm.M31 * vm.M31 + vm.M32 * vm.M32 + vm.M33 * vm.M33);
-
-                DebugLogger.LogDebug($"  M44: {vm.M44:F6}");
-                DebugLogger.LogDebug($"  Translation: ({vm.M41:F2}, {vm.M42:F2}, {vm.M43:F2})");
-                DebugLogger.LogDebug($"  Right mag: {rightMag:F4}, Up mag: {upMag:F4}, Fwd mag: {fwdMag:F4}");
-                DebugLogger.LogDebug($"  Right: ({vm.M11:F3}, {vm.M12:F3}, {vm.M13:F3})");
-                DebugLogger.LogDebug($"  Up: ({vm.M21:F3}, {vm.M22:F3}, {vm.M23:F3})");
-                DebugLogger.LogDebug($"  Forward: ({vm.M31:F3}, {vm.M32:F3}, {vm.M33:F3})");
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.LogDebug($"ERROR verifying ViewMatrix for {name}: {ex}");
-            }
-        }
-
-        /// <summary>
-        /// Finds only the FPS camera during initialization (from commit 7e83931)
-        /// </summary>
-        private static ulong FindFpsCamera(ulong listItemsPtr, int count)
-        {
-            ulong fpsCamera = 0;
-
-            DebugLogger.LogDebug($"\n=== Searching for FPS Camera ===");
-            DebugLogger.LogDebug($"List Items Ptr: 0x{listItemsPtr:X}");
-            DebugLogger.LogDebug($"Camera Count: {count}");
-
-            for (int i = 0; i < Math.Min(count, CameraConstants.MaxCameraSearchCount); i++)
-            {
-                try
-                {
-                    ulong cameraEntryAddr = listItemsPtr + (uint)(i * CameraConstants.CameraListStride);
-                    var cameraPtr = Memory.ReadPtr(cameraEntryAddr, false);
-
-                    if (cameraPtr == 0 || cameraPtr > CameraConstants.MaxValidPointer)
-                        continue;
-
-                    var gameObjectPtr = Memory.ReadPtr(cameraPtr + UnitySDK.UnityOffsets.Component_GameObjectOffset, false);
-                    if (gameObjectPtr == 0 || gameObjectPtr > CameraConstants.MaxValidPointer)
-                        continue;
-
-                    var namePtr = Memory.ReadPtr(gameObjectPtr + UnitySDK.UnityOffsets.GameObject_NameOffset, false);
-                    if (namePtr == 0 || namePtr > CameraConstants.MaxValidPointer)
-                        continue;
-
-                    var name = Memory.ReadUtf8String(namePtr, CameraConstants.MaxCameraNameLength, false);
-                    if (string.IsNullOrEmpty(name) || name.Length < CameraConstants.MinCameraNameLength)
-                        continue;
-
-                    bool isFPS = name.Contains("FPS", StringComparison.OrdinalIgnoreCase) &&
-                                name.Contains("Camera", StringComparison.OrdinalIgnoreCase);
-
-                    if (isFPS)
-                    {
-                        fpsCamera = cameraPtr;
-                        DebugLogger.LogDebug($"       Found FPS Camera");
-                        break;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    DebugLogger.LogDebug($"  [{i:D2}] Exception: {ex.Message}");
-                }
-            }
-
-            DebugLogger.LogDebug($"\n=== Search Results ===");
-            DebugLogger.LogDebug($"  FPS Camera:   {(fpsCamera != 0 ? $" Found @ 0x{fpsCamera:X}" : " NOT FOUND")}");
-
-            return fpsCamera;
-        }
-
-        /// <summary>
-        /// Validates an Optic Camera by checking if its view matrix contains valid data
-        /// </summary>
-        private static bool ValidateOpticCameraMatrix(ulong cameraPtr)
-        {
-            try
-            {
-                var matrixAddress = GetMatrixAddress(cameraPtr, "Optic");
-
-                var vm = Memory.ReadValue<Matrix4x4>(matrixAddress + UnitySDK.UnityOffsets.Camera_ViewMatrixOffset, false);
-
-                if (Math.Abs(vm.M44) < CameraConstants.MinNonZeroValue)
-                {
-                    DebugLogger.LogDebug($"       Optic Camera validation failed: M44 is zero ({vm.M44})");
-                    return false;
-                }
-
-                if (Math.Abs(vm.M41) < CameraConstants.MinNonZeroValue && 
-                    Math.Abs(vm.M42) < CameraConstants.MinNonZeroValue && 
-                    Math.Abs(vm.M43) < CameraConstants.MinNonZeroValue)
-                {
-                    DebugLogger.LogDebug($"       Optic Camera validation failed: Translation is all zeros");
-                    return false;
-                }
-
-                float rightMag = MathF.Sqrt(vm.M11 * vm.M11 + vm.M12 * vm.M12 + vm.M13 * vm.M13);
-                float upMag = MathF.Sqrt(vm.M21 * vm.M21 + vm.M22 * vm.M22 + vm.M23 * vm.M23);
-                float fwdMag = MathF.Sqrt(vm.M31 * vm.M31 + vm.M32 * vm.M32 + vm.M33 * vm.M33);
-
-                if (rightMag < CameraConstants.MinVectorMagnitude && 
-                    upMag < CameraConstants.MinVectorMagnitude && 
-                    fwdMag < CameraConstants.MinVectorMagnitude)
-                {
-                    DebugLogger.LogDebug($"       Optic Camera validation failed: All rotation magnitudes too small (R:{rightMag:F3} U:{upMag:F3} F:{fwdMag:F3})");
-                    return false;
-                }
-
-                bool hasValidVectors = false;
-                if (rightMag >= CameraConstants.MinVectorMagnitude && rightMag <= CameraConstants.MaxVectorMagnitude)
-                    hasValidVectors = true;
-                if (upMag >= CameraConstants.MinVectorMagnitude && upMag <= CameraConstants.MaxVectorMagnitude)
-                    hasValidVectors = true;
-                if (fwdMag >= CameraConstants.MinVectorMagnitude && fwdMag <= CameraConstants.MaxVectorMagnitude)
-                    hasValidVectors = true;
-
-                if (!hasValidVectors)
-                {
-                    DebugLogger.LogDebug($"       Optic Camera validation failed: All vector magnitudes out of reasonable range (R:{rightMag:F3} U:{upMag:F3} F:{fwdMag:F3})");
-                    return false;
-                }
-
-                DebugLogger.LogDebug($"       Optic Camera validation passed: M44:{vm.M44:F3} Trans:({vm.M41:F2},{vm.M42:F2},{vm.M43:F2}) Mags:(R:{rightMag:F3} U:{upMag:F3} F:{fwdMag:F3})");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.LogDebug($"       Optic Camera validation exception: {ex.Message}");
-                return false;
-            }
-        }
-
         private bool CheckIfScoped(LocalPlayer localPlayer)
         {
             try
             {
-                if (localPlayer is null)
-                    return false;
-
-                if (!OpticCameraActive)
+                if (localPlayer is null || !OpticCameraActive)
                     return false;
 
                 var opticsPtr = Memory.ReadPtr(localPlayer.PWA + Offsets.ProceduralWeaponAnimation._optics);
-
                 using var optics = UnityList<VmmPointer>.Create(opticsPtr, true);
 
                 if (optics.Count > 0)
@@ -446,14 +233,10 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Camera
                     var sightComponent = Memory.ReadValue<SightComponent>(pSightComponent);
 
                     if (sightComponent.ScopeZoomValue != 0f)
-                    {
-                        bool result = sightComponent.ScopeZoomValue > CameraConstants.MinScopeZoom;
-                        return result;
-                    }
+                        return sightComponent.ScopeZoomValue > CameraConstants.MinScopeZoom;
 
                     float zoomLevel = sightComponent.GetZoomLevel();
-                    bool zoomResult = zoomLevel > CameraConstants.MinScopeZoom;
-                    return zoomResult;
+                    return zoomLevel > CameraConstants.MinScopeZoom;
                 }
 
                 return false;
@@ -471,49 +254,27 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Camera
             {
                 IsADS = localPlayer?.CheckIfADS() ?? false;
 
-                // Reset flag when not ADS (from commit 7e83931)
                 if (!IsADS)
-                {
                     _useFpsCameraForCurrentAds = false;
-                }
 
-                // Cached optic camera search logic (from commit 7e83931)
-                if (IsADS && OpticCameraPtr == 0)
+                if (IsADS && OpticCameraPtr == 0 && !_useFpsCameraForCurrentAds)
                 {
-                    if (!_useFpsCameraForCurrentAds)
+                    if (_hasSearchedForPotentialCameras && _potentialOpticCameras.Count > 0)
                     {
-                        if (_hasSearchedForPotentialCameras && _potentialOpticCameras.Count > 0)
+                        if (!ValidateOpticCameras())
+                            _useFpsCameraForCurrentAds = true;
+                    }
+                    else
+                    {
+                        CameraSearch.SearchOpticCameras(_potentialOpticCameras, ref _hasSearchedForPotentialCameras);
+                        if (_potentialOpticCameras.Count > 0)
                         {
-                            if (ValidateOpticCameras())
-                            {
-                                DebugLogger.LogDebug("Using validated optic camera from cache");
-                            }
-                            else
-                            {
+                            if (!ValidateOpticCameras())
                                 _useFpsCameraForCurrentAds = true;
-                                DebugLogger.LogDebug("No valid optic cameras in cache, using FPS camera for this ADS");
-                            }
                         }
                         else
                         {
-                            SearchOpticCameras();
-                            if (_potentialOpticCameras.Count > 0)
-                            {
-                                if (ValidateOpticCameras())
-                                {
-                                    DebugLogger.LogDebug("Using validated optic camera from cache");
-                                }
-                                else
-                                {
-                                    _useFpsCameraForCurrentAds = true;
-                                    DebugLogger.LogDebug("No valid optic cameras found, using FPS camera for this ADS");
-                                }
-                            }
-                            else
-                            {
-                                _useFpsCameraForCurrentAds = true;
-                                DebugLogger.LogDebug("No potential optic cameras found, using FPS camera");
-                            }
+                            _useFpsCameraForCurrentAds = true;
                         }
                     }
                 }
@@ -535,11 +296,8 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Camera
                 scatter.PrepareReadValue<Matrix4x4>(vmAddr);
                 scatter.Completed += (sender, s) =>
                 {
-                    if (s.ReadValue<Matrix4x4>(vmAddr, out var vm))
-                    {
-                        if (!Unsafe.IsNullRef(ref vm))
-                            _viewMatrix.Update(ref vm);
-                    }
+                    if (s.ReadValue<Matrix4x4>(vmAddr, out var vm) && !Unsafe.IsNullRef(ref vm))
+                        _viewMatrix.Update(ref vm);
                 };
 
                 if (IsScoped)
@@ -554,7 +312,6 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Camera
                     {
                         if (s.ReadValue<float>(fovAddr, out var fov))
                             _fov = fov;
-
                         if (s.ReadValue<float>(aspectAddr, out var aspect))
                             _aspect = aspect;
                     };
@@ -566,152 +323,20 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Camera
             }
         }
 
-        /// <summary>
-        /// Validates cached potential optic cameras and sets up a valid one if found (from commit 7e83931)
-        /// </summary>
         private bool ValidateOpticCameras()
         {
-            try
+            foreach (var cameraPtr in _potentialOpticCameras)
             {
-                DebugLogger.LogDebug($"Validating {_potentialOpticCameras.Count} cached optic cameras...");
-
-                foreach (var cameraPtr in _potentialOpticCameras)
+                if (CameraSearch.ValidateOpticCameraMatrix(cameraPtr))
                 {
-                    if (ValidateOpticCameraMatrix(cameraPtr))
-                    {
-                        // Found a valid optic camera, set it up
-                        OpticCameraPtr = cameraPtr;
-                        _opticMatrixAddress = GetMatrixAddress(cameraPtr, "Optic");
-                        DebugLogger.LogDebug($"Successfully validated and set up Optic Camera: 0x{cameraPtr:X}");
-                        VerifyViewMatrix(_opticMatrixAddress, "Optic");
-                        return true;
-                    }
-                }
-
-                DebugLogger.LogDebug("No valid optic camera found in cache");
-                return false;
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.LogDebug($"ValidateOpticCameras error: {ex.Message}");
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Search and cache all potential optic cameras (from commit 7e83931)
-        /// </summary>
-        private void SearchOpticCameras()
-        {
-            try
-            {
-                if (_hasSearchedForPotentialCameras) return;
-
-                var allCamerasPtr = AllCameras.GetPtr(Memory.UnityBase);
-                if (allCamerasPtr == 0) return;
-
-                var listItemsPtr = Memory.ReadPtr(allCamerasPtr + 0x0, false);
-                var count = Memory.ReadValue<int>(allCamerasPtr + CameraConstants.CameraListCountOffset, false);
-
-                DebugLogger.LogDebug($"Searching for potential optic cameras... ({count} cameras available)");
-
-                for (int i = 0; i < count; i++)
-                {
-                    try
-                    {
-                        ulong cameraEntryAddr = listItemsPtr + (uint)(i * CameraConstants.CameraListStride);
-                        var cameraPtr = Memory.ReadPtr(cameraEntryAddr, false);
-
-                        if (cameraPtr == 0 || cameraPtr > CameraConstants.MaxValidPointer) continue;
-
-                        var gameObjectPtr = Memory.ReadPtr(cameraPtr + UnitySDK.UnityOffsets.Component_GameObjectOffset, false);
-                        if (gameObjectPtr == 0 || gameObjectPtr > CameraConstants.MaxValidPointer) continue;
-
-                        var namePtr = Memory.ReadPtr(gameObjectPtr + UnitySDK.UnityOffsets.GameObject_NameOffset, false);
-                        if (namePtr == 0 || namePtr > CameraConstants.MaxValidPointer) continue;
-
-                        var name = Memory.ReadUtf8String(namePtr, CameraConstants.MaxCameraNameLength, false);
-                        if (string.IsNullOrEmpty(name) || name.Length < CameraConstants.MinCameraNameLength) continue;
-
-                        // Check for potential Optic Camera (Clone or Optic)
-                        bool isPotentialOptic = (name.Contains("Clone", StringComparison.OrdinalIgnoreCase) ||
-                                                 name.Contains("Optic", StringComparison.OrdinalIgnoreCase)) &&
-                                                 name.Contains("Camera", StringComparison.OrdinalIgnoreCase);
-
-                        if (isPotentialOptic)
-                        {
-                            DebugLogger.LogDebug($"Found potential Optic Camera: {name}");
-                            _potentialOpticCameras.Add(cameraPtr);
-                        }
-                    }
-                    catch
-                    {
-                        // continue searching
-                    }
-                }
-
-                _hasSearchedForPotentialCameras = true;
-                DebugLogger.LogDebug($"Potential optic camera search complete: {_potentialOpticCameras.Count} cameras cached");
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.LogDebug($"SearchOpticCameras error: {ex.Message}");
-            }
-        }
-
-        #region SightComponent Structures
-        [StructLayout(LayoutKind.Explicit, Pack = 1)]
-        private readonly struct SightComponent
-        {
-            [FieldOffset((int)Offsets.SightComponent._template)]
-            private readonly ulong pSightInterface;
-
-            [FieldOffset((int)Offsets.SightComponent.ScopesSelectedModes)]
-            private readonly ulong pScopeSelectedModes;
-
-            [FieldOffset((int)Offsets.SightComponent.SelectedScope)]
-            private readonly int SelectedScope;
-
-            [FieldOffset((int)Offsets.SightComponent.ScopeZoomValue)]
-            public readonly float ScopeZoomValue;
-
-            public readonly float GetZoomLevel()
-            {
-                try
-                {
-                    using var zoomArray = SightInterface.Zooms;
-                    if (SelectedScope >= zoomArray.Count || SelectedScope < 0 || SelectedScope > CameraConstants.MaxSelectedScopeIndex)
-                        return -1.0f;
-
-                    using var selectedScopeModes = UnityArray<int>.Create(pScopeSelectedModes, false);
-                    int selectedScopeMode = SelectedScope >= selectedScopeModes.Count ? 0 : selectedScopeModes[SelectedScope];
-                    ulong zoomAddr = zoomArray[SelectedScope] + UnityArray<float>.ArrBaseOffset + (uint)selectedScopeMode * CameraConstants.ZoomElementSize;
-
-                    float zoomLevel = Memory.ReadValue<float>(zoomAddr, false);
-                    if (zoomLevel.IsNormalOrZero() && zoomLevel >= 0f && zoomLevel < CameraConstants.MaxValidZoom)
-                        return zoomLevel;
-
-                    return -1.0f;
-                }
-                catch (Exception ex)
-                {
-                    DebugLogger.LogDebug($"ERROR in GetZoomLevel: {ex}");
-                    return -1.0f;
+                    OpticCameraPtr = cameraPtr;
+                    _opticMatrixAddress = CameraSearch.GetMatrixAddress(cameraPtr, "Optic");
+                    CameraSearch.VerifyViewMatrix(_opticMatrixAddress, "Optic");
+                    return true;
                 }
             }
-
-            public readonly SightInterface SightInterface => Memory.ReadValue<SightInterface>(pSightInterface);
+            return false;
         }
-
-        [StructLayout(LayoutKind.Explicit, Pack = 1)]
-        private readonly struct SightInterface
-        {
-            [FieldOffset((int)Offsets.SightInterface.Zooms)]
-            private readonly ulong pZooms;
-
-            public readonly UnityArray<ulong> Zooms => UnityArray<ulong>.Create(pZooms, true);
-        }
-        #endregion
 
         public static CameraDebugSnapshot GetDebugSnapshot()
         {

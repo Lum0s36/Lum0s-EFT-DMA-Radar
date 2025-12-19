@@ -1,39 +1,10 @@
 /*
  * Lone EFT DMA Radar
- * Brought to you by Lone (Lone DMA)
- * 
-MIT License
+ * MIT License - Copyright (c) 2025 Lone DMA
+ */
 
-Copyright (c) 2025 Lone DMA
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
- *
-*/
-
-using LoneEftDmaRadar.Common.DMA;
-using LoneEftDmaRadar.DMA;
-using LoneEftDmaRadar.Misc.JSON;
 using LoneEftDmaRadar.UI.ColorPicker;
 using LoneEftDmaRadar.UI.Data;
-using LoneEftDmaRadar.UI.Loot;
-using LoneEftDmaRadar.Tarkov.Unity.Structures;
-using Size = System.Windows.Size;
 using System.Collections.ObjectModel;
 using VmmSharpEx.Extensions.Input;
 
@@ -48,313 +19,88 @@ namespace LoneEftDmaRadar
         {
             WriteIndented = true
         };
-        /// <summary>
-        /// Public Constructor required for deserialization.
-        /// DO NOT CALL - USE LOAD().
-        /// </summary>
+
         public EftDmaConfig() { }
 
-        /// <summary>
-        /// DMA Config
-        /// </summary>
+        #region Config Sections
+
         [JsonPropertyName("dma")]
         [JsonInclude]
         public DMAConfig DMA { get; private set; } = new();
 
-        /// <summary>
-        /// Profile API Config.
-        /// </summary>
         [JsonPropertyName("profileApi")]
         [JsonInclude]
         public ProfileApiConfig ProfileApi { get; private set; } = new();
 
-        /// <summary>
-        /// Twitch API Config (for streamer lookup).
-        /// </summary>
         [JsonPropertyName("twitchApi")]
         [JsonInclude]
         public TwitchApiConfig TwitchApi { get; private set; } = new();
 
-        /// <summary>
-        /// UI/Radar Config
-        /// </summary>
         [JsonPropertyName("ui")]
         [JsonInclude]
         public UIConfig UI { get; private set; } = new();
 
-        /// <summary>
-        /// Web Radar Config
-        /// </summary>
         [JsonPropertyName("webRadar")]
         [JsonInclude]
         public WebRadarConfig WebRadar { get; private set; } = new();
 
-        /// <summary>
-        /// FilteredLoot Config
-        /// </summary>
         [JsonPropertyName("loot")]
         [JsonInclude]
         public LootConfig Loot { get; private set; } = new LootConfig();
 
-        /// <summary>
-        /// Containers configuration.
-        /// </summary>
         [JsonPropertyName("containers")]
         [JsonInclude]
         public ContainersConfig Containers { get; private set; } = new();
 
-        /// <summary>
-        /// Hotkeys Dictionary for Radar.
-        /// </summary>
         [JsonPropertyName("hotkeys_v2")]
         [JsonInclude]
-        public ConcurrentDictionary<Win32VirtualKey, string> Hotkeys { get; private set; } = new(); // Default entries
+        public ConcurrentDictionary<Win32VirtualKey, string> Hotkeys { get; private set; } = new();
 
-        /// <summary>
-        /// Hotkey input mode - determines where hotkeys are detected from.
-        /// </summary>
         [JsonPropertyName("hotkeyInputMode")]
         [JsonConverter(typeof(JsonStringEnumConverter))]
         public HotkeyInputMode HotkeyInputMode { get; set; } = HotkeyInputMode.RadarPC;
 
-        /// <summary>
-        /// All defined Radar Colors.
-        /// </summary>
         [JsonPropertyName("radarColors")]
         [JsonConverter(typeof(ColorDictionaryConverter))]
         [JsonInclude]
         public ConcurrentDictionary<ColorPickerOption, string> RadarColors { get; private set; } = new();
 
-        /// <summary>
-        /// Widgets Configuration.
-        /// </summary>
         [JsonInclude]
         [JsonPropertyName("aimviewWidget")]
         public AimviewWidgetConfig AimviewWidget { get; private set; } = new();
 
-        /// <summary>
-        /// Widgets Configuration.
-        /// </summary>
         [JsonInclude]
         [JsonPropertyName("infoWidget")]
         public InfoWidgetConfig InfoWidget { get; private set; } = new();
 
-        /// <summary>
-        /// Loot Info Widget Configuration.
-        /// </summary>
         [JsonInclude]
         [JsonPropertyName("lootInfoWidget")]
         public LootInfoWidgetConfig LootInfoWidget { get; private set; } = new();
 
-        /// <summary>
-        /// Settings for Device Aimbot (DeviceAimbot/KMBox).
-        /// </summary>
         [JsonPropertyName("device")]
         [JsonInclude]
         public DeviceAimbotConfig Device { get; private set; } = new();
 
-        /// <summary>
-        /// Settings for memory write based features.
-        /// </summary>
         [JsonPropertyName("memWrites")]
         [JsonInclude]
         public MemWritesConfig MemWrites { get; private set; } = new();
 
-        /// <summary>
-        /// Player Watchlist Collection.
-        /// ** ONLY USE FOR BINDING **
-        /// </summary>
         [JsonInclude]
         [JsonPropertyName("playerWatchlist")]
-        public ObservableCollection<PlayerWatchlistEntry> PlayerWatchlist { get; private set; } = new()
-        {
-            new PlayerWatchlistEntry { AcctID = "2403694", Reason = "twitch/donpscelli_", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "152977", Reason = "twitch/HONEYxxo", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "835112", Reason = "twitch/lvndmark", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "376689", Reason = "twitch/summit1g", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "11387881", Reason = "twitch/tigz", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "1049972", Reason = "twitch/hutchmf", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2989797", Reason = "twitch/viibiin", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "354136", Reason = "twitch/klean", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "1717857", Reason = "twitch/jessekazam", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "3391828", Reason = "twitch/nyxia", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2438239", Reason = "twitch/xblazed", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "831617", Reason = "twitch/velion", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "3526004", Reason = "twitch/gingy", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "4637816", Reason = "twitch/trey24k", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "1663669", Reason = "twitch/desmondpilak", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "763945", Reason = "twitch/aquafps", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2111653", Reason = "twitch/bakeezy", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2095752", Reason = "twitch/blueberrygabi", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2165308", Reason = "twitch/smittystone", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "1153634", Reason = "twitch/2thy", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "3982736", Reason = "twitch/gl40labsrat", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "971133", Reason = "twitch/rengawr", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "4897027", Reason = "twitch/annemunition", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "9347828", Reason = "twitch/honeyxxo", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2058310", Reason = "twitch/moman", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "3424723", Reason = "twitch/binoia", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "5006226", Reason = "twitch/cooldee__", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "4609337", Reason = "twitch/ponch", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "927745", Reason = "twitch/goes", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "4764608", Reason = "twitch/tobytwofaced", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2043138", Reason = "twitch/kkersanovtv", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "8484894", Reason = "twitch/nogenerals", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "1294950", Reason = "twitch/wildez", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "1942597", Reason = "twitch/cwis0r", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2334119", Reason = "twitch/jaybaybay", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "6541088", Reason = "twitch/shoes", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "654070", Reason = "twitch/cryodrollic", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2250762", Reason = "twitch/mismagpie", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "3351793", Reason = "twitch/nohelmetchad", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "5158172", Reason = "twitch/undeadessence", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "9351502", Reason = "twitch/burgaofps", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "4168016", Reason = "twitch/endra", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "739353", Reason = "twitch/knueppelpaste", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "1312997", Reason = "twitch/vonza", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2739217", Reason = "twitch/volayethor", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "3400742", Reason = "twitch/fudgexl", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2763053", Reason = "twitch/mzdunk", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2329796", Reason = "twitch/philbo", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "1758499", Reason = "twitch/someman", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "859833", Reason = "twitch/baxbeast", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "766970", Reason = "twitch/genooo", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2773520", Reason = "twitch/skidohunter", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2554678", Reason = "twitch/rileyarmageddon", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "3998491", Reason = "twitch/kongstyle101", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "3569522", Reason = "twitch/realkraftyy", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "5550265", Reason = "twitch/tomrander", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2991546", Reason = "twitch/smol", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2673247", Reason = "twitch/shotsofvaca_", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "1632126", Reason = "twitch/wenotrat", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2755056", Reason = "twitch/valarman", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "4825441", Reason = "twitch/doubledstroyer", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "5311265", Reason = "twitch/vazquez66", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "10799845", Reason = "twitch/ashnue", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "7225268", Reason = "twitch/crylixblooom", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "1712951", Reason = "twitch/mvze_", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "4194405", Reason = "twitch/shwiftyfps", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "8336334", Reason = "twitch/swirrrly", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "885958", Reason = "twitch/switch360tv", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "5711540", Reason = "twitch/jewlee", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "6567825", Reason = "twitch/strongeo", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "926010", Reason = "twitch/toastracktv", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "851122", Reason = "twitch/cocaoo_", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "4034904", Reason = "twitch/verybadscav", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2277116", Reason = "twitch/imbobby__", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "3042051", Reason = "twitch/wardell", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2031346", Reason = "twitch/maza4kst", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "39632", Reason = "twitch/jimpanse", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "10480940", Reason = "twitch/chi_chaan", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "3515629", Reason = "twitch/daskicosin", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2207216", Reason = "twitch/logicalsolutions", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2971732", Reason = "twitch/myst1s", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2592389", Reason = "twitch/pixel8_ttv", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "1827749", Reason = "twitch/applebr1nger", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "6170674", Reason = "twitch/wo1f_gg", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "3330252", Reason = "twitch/blinge1", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "4544185", Reason = "twitch/impatiya", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "5602537", Reason = "twitch/schmidttyb", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "1126512", Reason = "twitch/torkie", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "1526877", Reason = "twitch/trentau", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "3581557", Reason = "twitch/tqmo__", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "7706088", Reason = "twitch/gilltex", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "1002256", Reason = "twitch/wondows", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "7674224", Reason = "twitch/cujoman", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "1161451", Reason = "twitch/gerysenior", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "922156", Reason = "twitch/hadess31", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "11468155", Reason = "twitch/butecodofranco", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "11013668", Reason = "twitch/joeliain2310", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "11118058", Reason = "twitch/moonshinefps", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "3118179", Reason = "twitch/soultura86", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "8115752", Reason = "twitch/renalakec", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "7085963", Reason = "twitch/notoriouspdx", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "3047477", Reason = "twitch/strngerping", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "10959843", Reason = "twitch/ry784", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "5646257", Reason = "twitch/mushamaru_", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "3539914", Reason = "twitch/rguardian", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "5463289", Reason = "twitch/wabrat", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "839191", Reason = "twitch/notechniquetv", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "7104272", Reason = "twitch/fiathegemini", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "9827614", Reason = "twitch/codex011", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "5051655", Reason = "twitch/dkaye23", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "8788838", Reason = "twitch/mrbubblyttv", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2799174", Reason = "twitch/sweetyboom", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "5308968", Reason = "twitch/oggyshoggy", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "427222", Reason = "twitch/steeyo", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "1481309", Reason = "twitch/anton", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "364768", Reason = "twitch/hayz", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "4411189", Reason = "twitch/hayz (hc)", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "5353635", Reason = "twitch/stankrat", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2614961", Reason = "twitch/oberst0m", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "6815534", Reason = "twitch/thatfriendlyguy", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "3441806", Reason = "twitch/JohnBBeta", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2238335", Reason = "twitch/zchum", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "8016990", Reason = "twitch/mistofhazmat", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "858816", Reason = "twitch/hipperpyah", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "380648", Reason = "twitch/sektenspinner", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "408825", Reason = "twitch/bubbinger", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2215415", Reason = "twitch/raggelton", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2693789", Reason = "twitch/zcritic", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "9283718", Reason = "twitch/triple_g", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "546813", Reason = "twitch/pepp", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "4432653", Reason = "twitch/hexloom", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "9826933", Reason = "twitch/satsuki_hotaru", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2699481", Reason = "twitch/headleyy", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2366827", Reason = "twitch/thomaspaste", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "1699605", Reason = "twitch/taxfree_", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "5378845", Reason = "twitch/thePridgeTTV", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "564115", Reason = "twitch/ghostfreak66", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "5817655", Reason = "twitch/engineergod", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "479729", Reason = "twitch/WaitImCheating", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "860017", Reason = "twitch/Baddie", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "137994", Reason = "twitch/BaudT", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "11351038", Reason = "twitch/thruststv", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "8381705", Reason = "twitch/cubFPS", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2997948", Reason = "twitch/sheefgg", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "4011779", Reason = "twitch/bearki", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2011844", Reason = "twitch/jonk", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "5975690", Reason = "twitch/smojii", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "165994", Reason = "twitch/willerz", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "641616", Reason = "twitch/pestily", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "1090448", Reason = "youtube/@DrLupo", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "1448970", Reason = "twitch/glorious_e", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "1080203", Reason = "twitch/hyperrattv", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "1425172", Reason = "twitch/axel_tv", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "3928278", Reason = "twitch/aims", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "740807", Reason = "twitch/b_komhate", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "923361", Reason = "twitch/swid", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "790774", Reason = "twitch/thepoolshark", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "417327", Reason = "twitch/wishyvt", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "10769222", Reason = "twitch/oimatewtf", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "8711935", Reason = "twitch/snok3z", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "11404544", Reason = "twitch/suddenly_toast", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "9052642", Reason = "twitch/mogu_vtuber", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "5225682", Reason = "twitch/beibei69", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "1284057", Reason = "twitch/dobbykillstreak", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "11024278", Reason = "twitch/yago0795", Timestamp = DateTime.Now },
-            new PlayerWatchlistEntry { AcctID = "2536192", Reason = "youtube/@Airwingmarine", Timestamp = DateTime.Now },
-        };
+        public ObservableCollection<PlayerWatchlistEntry> PlayerWatchlist { get; private set; } = CreateDefaultWatchlist();
 
-        /// <summary>
-        /// FilteredLoot Filters Config.
-        /// </summary>
         [JsonInclude]
         [JsonPropertyName("lootFilters")]
         public LootFilterConfig LootFilters { get; private set; } = new();
 
-        /// <summary>
-        /// Quest Helper Configuration.
-        /// </summary>
         [JsonPropertyName("questHelper")]
         [JsonInclude]
         public QuestHelperConfig QuestHelper { get; private set; } = new();
 
+        #endregion
+
         #region Config Interface
 
-        /// <summary>
-        /// Filename of this Config File (not full path).
-        /// </summary>
         [JsonIgnore]
         internal const string Filename = "Config-EFT.json";
 
@@ -370,12 +116,6 @@ namespace LoneEftDmaRadar
         [JsonIgnore]
         private static readonly FileInfo _backupFile = new(Path.Combine(App.ConfigPath.FullName, Filename + ".bak"));
 
-        /// <summary>
-        /// Loads the configuration from disk.
-        /// Creates a new config if it does not exist.
-        /// ** ONLY CALL ONCE PER MUTEX **
-        /// </summary>
-        /// <returns>Loaded Config.</returns>
         public static EftDmaConfig Load()
         {
             EftDmaConfig config;
@@ -397,7 +137,7 @@ namespace LoneEftDmaRadar
                             MessageBoxButton.OKCancel,
                             MessageBoxImage.Error);
                         if (dlg == MessageBoxResult.Cancel)
-                            Environment.Exit(0); // Terminate program
+                            Environment.Exit(0);
                         config = new EftDmaConfig();
                         SaveInternal(config);
                     }
@@ -423,14 +163,10 @@ namespace LoneEftDmaRadar
             }
             catch
             {
-                return null; // Ignore errors, return null to indicate failure
+                return null;
             }
         }
 
-        /// <summary>
-        /// Save the current configuration to disk.
-        /// </summary>
-        /// <exception cref="IOException"></exception>
         public void Save()
         {
             lock (_syncRoot)
@@ -446,10 +182,6 @@ namespace LoneEftDmaRadar
             }
         }
 
-        /// <summary>
-        /// Saves the current configuration to disk asynchronously.
-        /// </summary>
-        /// <returns></returns>
         public async Task SaveAsync() => await Task.Run(Save);
 
         private static void SaveInternal(EftDmaConfig config)
@@ -488,967 +220,182 @@ namespace LoneEftDmaRadar
         }
 
         #endregion
-    }
 
-    public sealed class DMAConfig
-    {
-        /// <summary>
-        /// FPGA Read Algorithm
-        /// </summary>
-        [JsonPropertyName("fpgaAlgo")]
-        public FpgaAlgo FpgaAlgo { get; set; } = FpgaAlgo.Auto;
+        #region Default Watchlist
 
-        /// <summary>
-        /// Use a Memory Map for FPGA DMA Connection.
-        /// </summary>
-        [JsonPropertyName("enableMemMap")]
-        public bool MemMapEnabled { get; set; } = true;
-
-        /// <summary>
-        /// Force a full memory refresh when a raid ends to prevent stale pointer issues.
-        /// This can help with raid detection problems on some systems.
-        /// </summary>
-        [JsonPropertyName("autoRefreshOnRaidEnd")]
-        public bool AutoRefreshOnRaidEnd { get; set; } = true;
-    }
-
-    public sealed class UIConfig
-    {
-        /// <summary>
-        /// UI Scale Value (0.5-2.0 , default: 1.0)
-        /// </summary>
-        [JsonPropertyName("scale")]
-        public float UIScale { get; set; } = 1.0f;
-
-        /// <summary>
-        /// Size of the Radar Window.
-        /// </summary>
-        [JsonPropertyName("windowSize")]
-        public Size WindowSize { get; set; } = new(1280, 720);
-        /// <summary>
-        /// Preferred rendering resolution for ESP/aim helpers.
-        /// </summary>
-        [JsonPropertyName("resolution")]
-        public Size Resolution { get; set; } = new(1920, 1080);
-
-        /// <summary>
-        /// Window is maximized.
-        /// </summary>
-        [JsonPropertyName("windowMaximized")]
-        public bool WindowMaximized { get; set; }
-
-        /// <summary>
-        /// Last used 'Zoom' level.
-        /// </summary>
-        [JsonPropertyName("zoom")]
-        public int Zoom { get; set; } = 100;
-
-        /// <summary>
-        /// Player/Teammates Aimline Length (Max: 1500)
-        /// </summary>
-        [JsonPropertyName("aimLineLength")]
-        public int AimLineLength { get; set; } = 1500;
-
-        /// <summary>
-        /// Camera Field of View (Vertical).
-        /// </summary>
-        [JsonPropertyName("fov")]
-        public float FOV { get; set; } = 50.0f;
-
-        /// <summary>
-        /// Show Mines/Claymores in the Radar UI.
-        /// </summary>
-        [JsonPropertyName("showMines")]
-        public bool ShowMines { get; set; } = true;
-
-        /// <summary>
-        /// Show Hazard zones (minefields, radiation, etc.) on Radar.
-        /// </summary>
-        [JsonPropertyName("showHazards")]
-        public bool ShowHazards { get; set; } = true;
-
-        /// <summary>
-        /// Show Exfil points on Radar.
-        /// </summary>
-        [JsonPropertyName("showExfils")]
-        public bool ShowExfils { get; set; } = true;
-
-        /// <summary>
-        /// Hides player names & extended player info in Radar GUI.
-        /// </summary>
-        [JsonPropertyName("hideNames")]
-        public bool HideNames { get; set; }
-
-        /// <summary>
-        /// Connects grouped players together via a semi-transparent line.
-        /// </summary>
-        [JsonPropertyName("connectGroups")]
-        public bool ConnectGroups { get; set; } = true;
-
-        /// <summary>
-        /// Max game distance to render targets in Aimview,
-        /// and to display dynamic aimlines between two players.
-        /// </summary>
-        [JsonPropertyName("maxDistance")]
-        public float MaxDistance { get; set; } = 350;
-        /// <summary>
-        /// True if teammate aimlines should be the same length as LocalPlayer.
-        /// </summary>
-        [JsonPropertyName("teammateAimlines")]
-        public bool TeammateAimlines { get; set; }
-
-        /// <summary>
-        /// Teammate Aimline Length (0 = use same as player's AimLineLength, Max: 1500)
-        /// </summary>
-        [JsonPropertyName("teammateAimlineLength")]
-        public int TeammateAimlineLength { get; set; } = 0;
-
-        /// <summary>
-        /// True if AI Aimlines should dynamically extend.
-        /// </summary>
-        [JsonPropertyName("aiAimlines")]
-        public bool AIAimlines { get; set; } = true;
-
-        /// <summary>
-        /// Mark players with suspicious stats.
-        /// </summary>
-        [JsonPropertyName("markSusPlayers")]
-        public bool MarkSusPlayers { get; set; } = false;
-
-        /// <summary>
-        /// Show Player Skeletons in ESP.
-        /// </summary>
-        [JsonPropertyName("espPlayerSkeletons")]
-        public bool EspPlayerSkeletons { get; set; } = true;
-
-        /// <summary>
-        /// Show Player Boxes in ESP.
-        /// </summary>
-        [JsonPropertyName("espPlayerBoxes")]
-        public bool EspPlayerBoxes { get; set; } = true;
-        
-        /// <summary>
-        /// Show AI Skeletons in ESP.
-        /// </summary>
-        [JsonPropertyName("espAISkeletons")]
-        public bool EspAISkeletons { get; set; } = true;
-
-        /// <summary>
-        /// Show AI Boxes in ESP.
-        /// </summary>
-        [JsonPropertyName("espAIBoxes")]
-        public bool EspAIBoxes { get; set; } = true;
-
-        /// <summary>
-        /// Show Player Names in ESP.
-        /// </summary>
-        [JsonPropertyName("espPlayerNames")]
-        public bool EspPlayerNames { get; set; } = true;
-        /// <summary>
-        /// Show Player Group IDs in ESP.
-        /// </summary>
-        [JsonPropertyName("espGroupIds")]
-        public bool EspGroupIds { get; set; } = true;
-        /// <summary>
-        /// Show Player faction (USEC/BEAR) in ESP.
-        /// </summary>
-        [JsonPropertyName("espPlayerFaction")]
-        public bool EspPlayerFaction { get; set; } = false;
-        /// <summary>
-        /// Color PMCs by faction (USEC/BEAR) when group colors are disabled.
-        /// </summary>
-        [JsonPropertyName("espFactionColors")]
-        public bool EspFactionColors { get; set; } = true;
-        /// <summary>
-        /// Color hostile human players by group.
-        /// </summary>
-        [JsonPropertyName("espGroupColors")]
-        public bool EspGroupColors { get; set; } = true;
-        /// <summary>
-        /// Show Player Health status in ESP.
-        /// </summary>
-        [JsonPropertyName("espPlayerHealth")]
-        public bool EspPlayerHealth { get; set; } = true;
-        /// <summary>
-        /// Show Player Distance in ESP.
-        /// </summary>
-        [JsonPropertyName("espPlayerDistance")]
-        public bool EspPlayerDistance { get; set; } = true;
-
-        /// <summary>
-        /// Show AI Names in ESP.
-        /// </summary>
-        [JsonPropertyName("espAINames")]
-        public bool EspAINames { get; set; } = true;
-        /// <summary>
-        /// Show AI Group IDs in ESP.
-        /// </summary>
-        [JsonPropertyName("espAIGroupIds")]
-        public bool EspAIGroupIds { get; set; } = false;
-        /// <summary>
-        /// Show AI Health status in ESP.
-        /// </summary>
-        [JsonPropertyName("espAIHealth")]
-        public bool EspAIHealth { get; set; } = true;
-        /// <summary>
-        /// Show AI Distance in ESP.
-        /// </summary>
-        [JsonPropertyName("espAIDistance")]
-        public bool EspAIDistance { get; set; } = true;
-
-        /// <summary>
-        /// Show ESP Overlay.
-        /// </summary>
-        [JsonPropertyName("showESP")]
-        public bool ShowESP { get; set; } = true;
-        
-        /// <summary>
-        /// Show Exfils on ESP.
-        /// </summary>
-        [JsonPropertyName("espExfils")]
-        public bool EspExfils { get; set; } = true;
-
-        [JsonPropertyName("espTripwires")]
-        public bool EspTripwires { get; set; } = true;
-
-        [JsonPropertyName("espGrenades")]
-        public bool EspGrenades { get; set; } = true;
-
-        /// <summary>
-        /// Show Loot on ESP.
-        /// </summary>
-        [JsonPropertyName("espLoot")]
-        public bool EspLoot { get; set; } = true;
-
-        /// <summary>
-        /// Show quest items on ESP.
-        /// </summary>
-        [JsonPropertyName("espQuestLoot")]
-        public bool EspQuestLoot { get; set; } = true;
-
-        /// <summary>
-        /// Show Loot Prices on ESP.
-        /// </summary>
-        [JsonPropertyName("espLootPrice")]
-        public bool EspLootPrice { get; set; } = true;
-
-        [JsonPropertyName("espLootConeEnabled")]
-        public bool EspLootConeEnabled { get; set; } = true;
-
-        [JsonPropertyName("espLootConeAngle")]
-        public float EspLootConeAngle { get; set; } = 15f;
-
-        /// <summary>
-        /// Show Food items on ESP.
-        /// </summary>
-        [JsonPropertyName("espFood")]
-        public bool EspFood { get; set; } = false;
-
-        /// <summary>
-        /// Show Medical items on ESP.
-        /// </summary>
-        [JsonPropertyName("espMeds")]
-        public bool EspMeds { get; set; } = false;
-
-        /// <summary>
-        /// Show Backpacks on ESP.
-        /// </summary>
-        [JsonPropertyName("espBackpacks")]
-        public bool EspBackpacks { get; set; } = false;
-
-        /// <summary>
-        /// Show wishlisted items on ESP.
-        /// </summary>
-        [JsonPropertyName("espShowWishlisted")]
-        public bool EspShowWishlisted { get; set; } = true;
-
-        /// <summary>
-        /// Show only filtered loot items on ESP (items in Loot Filters).
-        /// </summary>
-        [JsonPropertyName("espLootFilterOnly")]
-        public bool EspLootFilterOnly { get; set; } = false;
-
-        /// <summary>
-        /// Show ESP Loot Debug overlay.
-        /// </summary>
-        [JsonPropertyName("espLootDebug")]
-        public bool EspLootDebug { get; set; } = false;
-
-        /// <summary>
-        /// Show Corpses on ESP.
-        /// </summary>
-        [JsonPropertyName("espCorpses")]
-        public bool EspCorpses { get; set; } = false;
-
-        /// <summary>
-        /// Show Containers on ESP.
-        /// </summary>
-        [JsonPropertyName("espContainers")]
-        public bool EspContainers { get; set; } = false;
-
-        /// <summary>
-        /// Show nearest player info in center-bottom of ESP window.
-        /// </summary>
-        [JsonPropertyName("espNearestPlayerInfo")]
-        public bool EspNearestPlayerInfo { get; set; } = true;
-
-        /// <summary>
-        /// Show a crosshair overlay on ESP window.
-        /// </summary>
-        [JsonPropertyName("espCrosshair")]
-        public bool EspCrosshair { get; set; }
-
-        /// <summary>
-        /// Crosshair half-length in pixels.
-        /// </summary>
-        [JsonPropertyName("espCrosshairLength")]
-        public float EspCrosshairLength { get; set; } = 25f;
-
-        /// <summary>
-        /// Font family used for ESP text (DX overlay).
-        /// </summary>
-        [JsonPropertyName("espFontFamily")]
-        public string EspFontFamily { get; set; } = "Segoe UI";
-
-        /// <summary>
-        /// Small font size used for ESP text (loot labels, etc).
-        /// </summary>
-        [JsonPropertyName("espFontSizeSmall")]
-        public int EspFontSizeSmall { get; set; } = 10;
-
-        /// <summary>
-        /// Medium font size used for ESP text (player names, exfil labels).
-        /// </summary>
-        [JsonPropertyName("espFontSizeMedium")]
-        public int EspFontSizeMedium { get; set; } = 12;
-
-        /// <summary>
-        /// Large font size used for ESP text (status banners).
-        /// </summary>
-        [JsonPropertyName("espFontSizeLarge")]
-        public int EspFontSizeLarge { get; set; } = 24;
-
-        /// <summary>
-        /// Custom ESP Screen Width (0 = Auto).
-        /// </summary>
-        [JsonPropertyName("espScreenWidth")]
-        public int EspScreenWidth { get; set; } = 0;
-
-        /// <summary>
-        /// Custom ESP Screen Height (0 = Auto).
-        /// </summary>
-        [JsonPropertyName("espScreenHeight")]
-        public int EspScreenHeight { get; set; } = 0;
-
-        /// <summary>
-        /// ESP Max FPS (0 = VSync/Unlimited).
-        /// </summary>
-        [JsonPropertyName("espMaxFPS")]
-        public int EspMaxFPS { get; set; } = 0;
-
-        // ESP Colors (independent from radar colors)
-        [JsonPropertyName("espColorPlayers")]
-        public string EspColorPlayers { get; set; } = "#FFFFFFFF";
-
-        [JsonPropertyName("espColorAI")]
-        public string EspColorAI { get; set; } = "#FFFFA500";
-
-        /// <summary>
-        /// ESP color for player-controlled scavs (PScavs).
-        /// </summary>
-        [JsonPropertyName("espColorPlayerScavs")]
-        public string EspColorPlayerScavs { get; set; } = "#FFFFFFFF";
-
-        [JsonPropertyName("espColorRaiders")]
-        public string EspColorRaiders { get; set; } = "#FFFFC70F";
-
-        [JsonPropertyName("espColorBosses")]
-        public string EspColorBosses { get; set; } = "#FFFF00FF";
-
-        [JsonPropertyName("espColorLoot")]
-        public string EspColorLoot { get; set; } = "#FFD0D0D0";
-
-        /// <summary>
-        /// ESP color for static containers.
-        /// </summary>
-        [JsonPropertyName("espColorContainers")]
-        public string EspColorContainers { get; set; } = "#FFFFFFCC";
-
-        [JsonPropertyName("espColorExfil")]
-        public string EspColorExfil { get; set; } = "#FF7FFFD4";
-
-        [JsonPropertyName("espColorTripwire")]
-        public string EspColorTripwire { get; set; } = "#FFFF4500";
-
-        [JsonPropertyName("espColorGrenade")]
-        public string EspColorGrenade { get; set; } = "#FFFF5500";
-
-        [JsonPropertyName("espColorCrosshair")]
-        public string EspColorCrosshair { get; set; } = "#FFFFFFFF";
-
-        /// <summary>
-        /// ESP faction color for BEAR PMCs (ESP only, not radar).
-        /// </summary>
-        [JsonPropertyName("espColorFactionBear")]
-        public string EspColorFactionBear { get; set; } = "#FFFF0000";
-        /// <summary>
-        /// ESP faction color for USEC PMCs (ESP only, not radar).
-        /// </summary>
-        [JsonPropertyName("espColorFactionUsec")]
-        public string EspColorFactionUsec { get; set; } = "#FF0000FF";
-
-        /// <summary>
-        /// Radar Max FPS (0 = unlimited). Lowering this can free headroom for ESP.
-        /// </summary>
-        [JsonPropertyName("radarMaxFPS")]
-        public int RadarMaxFPS { get; set; } = 0;
-
-        /// <summary>
-        /// Maximum distance to render players on ESP (in meters). 0 = unlimited.
-        /// </summary>
-        [JsonPropertyName("espPlayerMaxDistance")]
-        public float EspPlayerMaxDistance { get; set; } = 0f;
-
-        /// <summary>
-        /// Maximum distance to render AI/Scavs on ESP (in meters). 0 = unlimited.
-        /// </summary>
-        [JsonPropertyName("espAIMaxDistance")]
-        public float EspAIMaxDistance { get; set; } = 0f;
-
-        /// <summary>
-        /// Maximum distance to render loot on ESP (in meters). 0 = unlimited.
-        /// </summary>
-        [JsonPropertyName("espLootMaxDistance")]
-        public float EspLootMaxDistance { get; set; } = 0f;
-
-        /// <summary>
-        /// Maximum distance to render loot in Aimview (in meters).
-        /// </summary>
-        [JsonPropertyName("aimviewLootRenderDistance")]
-        public float AimviewLootRenderDistance { get; set; } = 25f;
-
-        /// <summary>
-        /// If true, Aimview loot render distance is unlimited (max).
-        /// </summary>
-        [JsonPropertyName("aimviewLootRenderDistanceMax")]
-        public bool AimviewLootRenderDistanceMax { get; set; } = false;
-
-        /// <summary>
-        /// Target screen index for ESP window (0 = Primary, 1+ = Secondary screens).
-        /// </summary>
-        [JsonPropertyName("espTargetScreen")]
-        public int EspTargetScreen { get; set; } = 0;
-
-        /// <summary>
-        /// Position of the name/distance label relative to the bounding box.
-        /// </summary>
-        [JsonPropertyName("espLabelPosition")]
-        [JsonConverter(typeof(JsonStringEnumConverter))]
-        public EspLabelPosition EspLabelPosition { get; set; } = EspLabelPosition.Top;
-        /// <summary>
-        /// Position of the AI/scav label relative to the bounding box.
-        /// </summary>
-        [JsonPropertyName("espLabelPositionAI")]
-        [JsonConverter(typeof(JsonStringEnumConverter))]
-        public EspLabelPosition EspLabelPositionAI { get; set; } = EspLabelPosition.Top;
-
-        /// <summary>
-        /// Draw a small circle on the head bone for ESP.
-        /// </summary>
-        [JsonPropertyName("espHeadCirclePlayers")]
-        public bool EspHeadCirclePlayers { get; set; } = false;
-        /// <summary>
-        /// Draw a small circle on the head bone for AI/Scavs.
-        /// </summary>
-        [JsonPropertyName("espHeadCircleAI")]
-        public bool EspHeadCircleAI { get; set; } = false;
-    }
-
-    public enum EspLabelPosition
-    {
-        Top,
-        Bottom
-    }
-
-    /// <summary>
-    /// Hotkey input mode - determines where hotkeys are detected from.
-    /// </summary>
-    public enum HotkeyInputMode
-    {
-        /// <summary>
-        /// Hotkeys are detected from the Radar PC keyboard (local machine running the program).
-        /// </summary>
-        RadarPC,
-        /// <summary>
-        /// Hotkeys are detected from the Game PC via DMA (existing behavior).
-        /// </summary>
-        GamePC
-    }
-
-    public sealed class LootConfig
-    {
-        /// <summary>
-        /// Shows loot on map.
-        /// </summary>
-        [JsonPropertyName("enabled")]
-        public bool Enabled { get; set; } = true;
-
-        /// <summary>
-        /// Show quest items on map/ESP.
-        /// </summary>
-        [JsonPropertyName("showQuestItems")]
-        public bool ShowQuestItems { get; set; } = true;
-
-        /// <summary>
-        /// Shows bodies/corpses on map.
-        /// </summary>
-        [JsonPropertyName("hideCorpses")]
-        public bool HideCorpses { get; set; }
-
-        /// <summary>
-        /// Show corpse markers in Radar/Aimview (independent from ESP).
-        /// </summary>
-        [JsonPropertyName("showCorpseMarkers")]
-        public bool ShowCorpseMarkers { get; set; } = false;
-
-        /// <summary>
-        /// Minimum loot value (rubles) to display 'normal loot' on map.
-        /// </summary>
-        [JsonPropertyName("minValue")]
-        public int MinValue { get; set; } = 50000;
-
-        /// <summary>
-        /// Minimum loot value (rubles) to display 'important loot' on map.
-        /// </summary>
-        [JsonPropertyName("minValueValuable")]
-        public int MinValueValuable { get; set; } = 200000;
-
-        /// <summary>
-        /// Show FilteredLoot by "Price per Slot".
-        /// </summary>
-        [JsonPropertyName("pricePerSlot")]
-        public bool PricePerSlot { get; set; }
-
-        /// <summary>
-        /// FilteredLoot Price Mode.
-        /// </summary>
-        [JsonPropertyName("priceMode")]
-        public LootPriceMode PriceMode { get; set; } = LootPriceMode.FleaMarket;
-
-        /// <summary>
-        /// Show wishlisted items on Radar.
-        /// </summary>
-        [JsonPropertyName("showWishlistedRadar")]
-        public bool ShowWishlistedRadar { get; set; } = true;
-
-        /// <summary>
-        /// Color for wishlisted items on Radar.
-        /// </summary>
-        [JsonPropertyName("wishlistColorRadar")]
-        public string WishlistColorRadar { get; set; } = "#FFFF0000";
-    }
-
-    public sealed class ContainersConfig
-    {
-        /// <summary>
-        /// Shows static containers on map.
-        /// </summary>
-        [JsonPropertyName("enabled")]
-        public bool Enabled { get; set; } = false;
-
-        /// <summary>
-        /// Maximum distance to draw static containers.
-        /// </summary>
-        [JsonPropertyName("drawDistance")]
-        public float DrawDistance { get; set; } = 100f;
-
-        /// <summary>
-        /// Maximum distance to draw static containers on ESP.
-        /// </summary>
-        [JsonPropertyName("espDrawDistance")]
-        public float EspDrawDistance { get; set; } = 100f;
-
-        /// <summary>
-        /// Select all containers.
-        /// </summary>
-        [JsonPropertyName("selectAll")]
-        public bool SelectAll { get; set; } = true;
-
-        /// <summary>
-        /// Hide containers that have been searched by local player.
-        /// </summary>
-        [JsonPropertyName("hideSearched")]
-        public bool HideSearched { get; set; } = false;
-
-        /// <summary>
-        /// Selected containers to display.
-        /// </summary>
-        [JsonPropertyName("selected_v4")]
-        [JsonInclude]
-        [JsonConverter(typeof(CaseInsensitiveConcurrentDictionaryConverter<byte>))]
-        public ConcurrentDictionary<string, byte> Selected { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
-    }
-
-    /// <summary>
-    /// Settings for device aimbot integration (DeviceAimbot/KMBox).
-    /// </summary>
-    public sealed class DeviceAimbotConfig
-    {
-        public bool Enabled { get; set; }
-        public bool AutoConnect { get; set; }
-        public string LastComPort { get; set; }
-
-        // Debug
-        public bool ShowDebug { get; set; } = true;
-
-        /// <summary>
-        /// Smoothing factor for DeviceAimbot device aim. 1 = instant, higher = slower/smoother.
-        /// </summary>
-        public float Smoothing { get; set; } = 1.0f;
-
-        // Targeting
-        public Bones TargetBone { get; set; } = Bones.HumanHead;
-        public float FOV { get; set; } = 90f;
-        public float MaxDistance { get; set; } = 300f;
-        public TargetingMode Targeting { get; set; } = TargetingMode.ClosestToCrosshair;
-        public bool EnablePrediction { get; set; } = true;
-
-        // Target Filters
-        public bool TargetPMC { get; set; } = true;
-        public bool TargetPlayerScav { get; set; } = true;
-        public bool TargetAIScav { get; set; } = true;
-        public bool TargetBoss { get; set; } = true;
-        public bool TargetRaider { get; set; } = true;
-
-        // KMBox NET
-        public bool UseKmBoxNet { get; set; } = false;
-        public string KmBoxNetIp { get; set; } = "192.168.2.4";
-        public int KmBoxNetPort { get; set; } = 8888;
-        public string KmBoxNetMac { get; set; } = "";
-
-        // FOV Circle Display
-        public bool ShowFovCircle { get; set; } = true;
-        public string FovCircleColorEngaged { get; set; } = "#FF00FF00"; // Green when engaged
-        public string FovCircleColorIdle { get; set; } = "#80FFFFFF"; // Semi-transparent white when idle
-
-        [JsonConverter(typeof(JsonStringEnumConverter))]
-        public enum TargetingMode
+        private static ObservableCollection<PlayerWatchlistEntry> CreateDefaultWatchlist()
         {
-            ClosestToCrosshair,
-            ClosestDistance
+            return new ObservableCollection<PlayerWatchlistEntry>
+            {
+                new() { AcctID = "2403694", Reason = "twitch/donpscelli_", Timestamp = DateTime.Now },
+                new() { AcctID = "152977", Reason = "twitch/HONEYxxo", Timestamp = DateTime.Now },
+                new() { AcctID = "835112", Reason = "twitch/lvndmark", Timestamp = DateTime.Now },
+                new() { AcctID = "376689", Reason = "twitch/summit1g", Timestamp = DateTime.Now },
+                new() { AcctID = "11387881", Reason = "twitch/tigz", Timestamp = DateTime.Now },
+                new() { AcctID = "1049972", Reason = "twitch/hutchmf", Timestamp = DateTime.Now },
+                new() { AcctID = "2989797", Reason = "twitch/viibiin", Timestamp = DateTime.Now },
+                new() { AcctID = "354136", Reason = "twitch/klean", Timestamp = DateTime.Now },
+                new() { AcctID = "1717857", Reason = "twitch/jessekazam", Timestamp = DateTime.Now },
+                new() { AcctID = "3391828", Reason = "twitch/nyxia", Timestamp = DateTime.Now },
+                new() { AcctID = "2438239", Reason = "twitch/xblazed", Timestamp = DateTime.Now },
+                new() { AcctID = "831617", Reason = "twitch/velion", Timestamp = DateTime.Now },
+                new() { AcctID = "3526004", Reason = "twitch/gingy", Timestamp = DateTime.Now },
+                new() { AcctID = "4637816", Reason = "twitch/trey24k", Timestamp = DateTime.Now },
+                new() { AcctID = "1663669", Reason = "twitch/desmondpilak", Timestamp = DateTime.Now },
+                new() { AcctID = "763945", Reason = "twitch/aquafps", Timestamp = DateTime.Now },
+                new() { AcctID = "2111653", Reason = "twitch/bakeezy", Timestamp = DateTime.Now },
+                new() { AcctID = "2095752", Reason = "twitch/blueberrygabi", Timestamp = DateTime.Now },
+                new() { AcctID = "2165308", Reason = "twitch/smittystone", Timestamp = DateTime.Now },
+                new() { AcctID = "1153634", Reason = "twitch/2thy", Timestamp = DateTime.Now },
+                new() { AcctID = "3982736", Reason = "twitch/gl40labsrat", Timestamp = DateTime.Now },
+                new() { AcctID = "971133", Reason = "twitch/rengawr", Timestamp = DateTime.Now },
+                new() { AcctID = "4897027", Reason = "twitch/annemunition", Timestamp = DateTime.Now },
+                new() { AcctID = "9347828", Reason = "twitch/honeyxxo", Timestamp = DateTime.Now },
+                new() { AcctID = "2058310", Reason = "twitch/moman", Timestamp = DateTime.Now },
+                new() { AcctID = "3424723", Reason = "twitch/binoia", Timestamp = DateTime.Now },
+                new() { AcctID = "5006226", Reason = "twitch/cooldee__", Timestamp = DateTime.Now },
+                new() { AcctID = "4609337", Reason = "twitch/ponch", Timestamp = DateTime.Now },
+                new() { AcctID = "927745", Reason = "twitch/goes", Timestamp = DateTime.Now },
+                new() { AcctID = "4764608", Reason = "twitch/tobytwofaced", Timestamp = DateTime.Now },
+                new() { AcctID = "2043138", Reason = "twitch/kkersanovtv", Timestamp = DateTime.Now },
+                new() { AcctID = "8484894", Reason = "twitch/nogenerals", Timestamp = DateTime.Now },
+                new() { AcctID = "1294950", Reason = "twitch/wildez", Timestamp = DateTime.Now },
+                new() { AcctID = "1942597", Reason = "twitch/cwis0r", Timestamp = DateTime.Now },
+                new() { AcctID = "2334119", Reason = "twitch/jaybaybay", Timestamp = DateTime.Now },
+                new() { AcctID = "6541088", Reason = "twitch/shoes", Timestamp = DateTime.Now },
+                new() { AcctID = "654070", Reason = "twitch/cryodrollic", Timestamp = DateTime.Now },
+                new() { AcctID = "2250762", Reason = "twitch/mismagpie", Timestamp = DateTime.Now },
+                new() { AcctID = "3351793", Reason = "twitch/nohelmetchad", Timestamp = DateTime.Now },
+                new() { AcctID = "5158172", Reason = "twitch/undeadessence", Timestamp = DateTime.Now },
+                new() { AcctID = "9351502", Reason = "twitch/burgaofps", Timestamp = DateTime.Now },
+                new() { AcctID = "4168016", Reason = "twitch/endra", Timestamp = DateTime.Now },
+                new() { AcctID = "739353", Reason = "twitch/knueppelpaste", Timestamp = DateTime.Now },
+                new() { AcctID = "1312997", Reason = "twitch/vonza", Timestamp = DateTime.Now },
+                new() { AcctID = "2739217", Reason = "twitch/volayethor", Timestamp = DateTime.Now },
+                new() { AcctID = "3400742", Reason = "twitch/fudgexl", Timestamp = DateTime.Now },
+                new() { AcctID = "2763053", Reason = "twitch/mzdunk", Timestamp = DateTime.Now },
+                new() { AcctID = "2329796", Reason = "twitch/philbo", Timestamp = DateTime.Now },
+                new() { AcctID = "1758499", Reason = "twitch/someman", Timestamp = DateTime.Now },
+                new() { AcctID = "859833", Reason = "twitch/baxbeast", Timestamp = DateTime.Now },
+                new() { AcctID = "766970", Reason = "twitch/genooo", Timestamp = DateTime.Now },
+                new() { AcctID = "2773520", Reason = "twitch/skidohunter", Timestamp = DateTime.Now },
+                new() { AcctID = "2554678", Reason = "twitch/rileyarmageddon", Timestamp = DateTime.Now },
+                new() { AcctID = "3998491", Reason = "twitch/kongstyle101", Timestamp = DateTime.Now },
+                new() { AcctID = "3569522", Reason = "twitch/realkraftyy", Timestamp = DateTime.Now },
+                new() { AcctID = "5550265", Reason = "twitch/tomrander", Timestamp = DateTime.Now },
+                new() { AcctID = "2991546", Reason = "twitch/smol", Timestamp = DateTime.Now },
+                new() { AcctID = "2673247", Reason = "twitch/shotsofvaca_", Timestamp = DateTime.Now },
+                new() { AcctID = "1632126", Reason = "twitch/wenotrat", Timestamp = DateTime.Now },
+                new() { AcctID = "2755056", Reason = "twitch/valarman", Timestamp = DateTime.Now },
+                new() { AcctID = "4825441", Reason = "twitch/doubledstroyer", Timestamp = DateTime.Now },
+                new() { AcctID = "5311265", Reason = "twitch/vazquez66", Timestamp = DateTime.Now },
+                new() { AcctID = "10799845", Reason = "twitch/ashnue", Timestamp = DateTime.Now },
+                new() { AcctID = "7225268", Reason = "twitch/crylixblooom", Timestamp = DateTime.Now },
+                new() { AcctID = "1712951", Reason = "twitch/mvze_", Timestamp = DateTime.Now },
+                new() { AcctID = "4194405", Reason = "twitch/shwiftyfps", Timestamp = DateTime.Now },
+                new() { AcctID = "8336334", Reason = "twitch/swirrrly", Timestamp = DateTime.Now },
+                new() { AcctID = "885958", Reason = "twitch/switch360tv", Timestamp = DateTime.Now },
+                new() { AcctID = "5711540", Reason = "twitch/jewlee", Timestamp = DateTime.Now },
+                new() { AcctID = "6567825", Reason = "twitch/strongeo", Timestamp = DateTime.Now },
+                new() { AcctID = "926010", Reason = "twitch/toastracktv", Timestamp = DateTime.Now },
+                new() { AcctID = "851122", Reason = "twitch/cocaoo_", Timestamp = DateTime.Now },
+                new() { AcctID = "4034904", Reason = "twitch/verybadscav", Timestamp = DateTime.Now },
+                new() { AcctID = "2277116", Reason = "twitch/imbobby__", Timestamp = DateTime.Now },
+                new() { AcctID = "3042051", Reason = "twitch/wardell", Timestamp = DateTime.Now },
+                new() { AcctID = "2031346", Reason = "twitch/maza4kst", Timestamp = DateTime.Now },
+                new() { AcctID = "39632", Reason = "twitch/jimpanse", Timestamp = DateTime.Now },
+                new() { AcctID = "10480940", Reason = "twitch/chi_chaan", Timestamp = DateTime.Now },
+                new() { AcctID = "3515629", Reason = "twitch/daskicosin", Timestamp = DateTime.Now },
+                new() { AcctID = "2207216", Reason = "twitch/logicalsolutions", Timestamp = DateTime.Now },
+                new() { AcctID = "2971732", Reason = "twitch/myst1s", Timestamp = DateTime.Now },
+                new() { AcctID = "2592389", Reason = "twitch/pixel8_ttv", Timestamp = DateTime.Now },
+                new() { AcctID = "1827749", Reason = "twitch/applebr1nger", Timestamp = DateTime.Now },
+                new() { AcctID = "6170674", Reason = "twitch/wo1f_gg", Timestamp = DateTime.Now },
+                new() { AcctID = "3330252", Reason = "twitch/blinge1", Timestamp = DateTime.Now },
+                new() { AcctID = "4544185", Reason = "twitch/impatiya", Timestamp = DateTime.Now },
+                new() { AcctID = "5602537", Reason = "twitch/schmidttyb", Timestamp = DateTime.Now },
+                new() { AcctID = "1126512", Reason = "twitch/torkie", Timestamp = DateTime.Now },
+                new() { AcctID = "1526877", Reason = "twitch/trentau", Timestamp = DateTime.Now },
+                new() { AcctID = "3581557", Reason = "twitch/tqmo__", Timestamp = DateTime.Now },
+                new() { AcctID = "7706088", Reason = "twitch/gilltex", Timestamp = DateTime.Now },
+                new() { AcctID = "1002256", Reason = "twitch/wondows", Timestamp = DateTime.Now },
+                new() { AcctID = "7674224", Reason = "twitch/cujoman", Timestamp = DateTime.Now },
+                new() { AcctID = "1161451", Reason = "twitch/gerysenior", Timestamp = DateTime.Now },
+                new() { AcctID = "922156", Reason = "twitch/hadess31", Timestamp = DateTime.Now },
+                new() { AcctID = "11468155", Reason = "twitch/butecodofranco", Timestamp = DateTime.Now },
+                new() { AcctID = "11013668", Reason = "twitch/joeliain2310", Timestamp = DateTime.Now },
+                new() { AcctID = "11118058", Reason = "twitch/moonshinefps", Timestamp = DateTime.Now },
+                new() { AcctID = "3118179", Reason = "twitch/soultura86", Timestamp = DateTime.Now },
+                new() { AcctID = "8115752", Reason = "twitch/renalakec", Timestamp = DateTime.Now },
+                new() { AcctID = "7085963", Reason = "twitch/notoriouspdx", Timestamp = DateTime.Now },
+                new() { AcctID = "3047477", Reason = "twitch/strngerping", Timestamp = DateTime.Now },
+                new() { AcctID = "10959843", Reason = "twitch/ry784", Timestamp = DateTime.Now },
+                new() { AcctID = "5646257", Reason = "twitch/mushamaru_", Timestamp = DateTime.Now },
+                new() { AcctID = "3539914", Reason = "twitch/rguardian", Timestamp = DateTime.Now },
+                new() { AcctID = "5463289", Reason = "twitch/wabrat", Timestamp = DateTime.Now },
+                new() { AcctID = "839191", Reason = "twitch/notechniquetv", Timestamp = DateTime.Now },
+                new() { AcctID = "7104272", Reason = "twitch/fiathegemini", Timestamp = DateTime.Now },
+                new() { AcctID = "9827614", Reason = "twitch/codex011", Timestamp = DateTime.Now },
+                new() { AcctID = "5051655", Reason = "twitch/dkaye23", Timestamp = DateTime.Now },
+                new() { AcctID = "8788838", Reason = "twitch/mrbubblyttv", Timestamp = DateTime.Now },
+                new() { AcctID = "2799174", Reason = "twitch/sweetyboom", Timestamp = DateTime.Now },
+                new() { AcctID = "5308968", Reason = "twitch/oggyshoggy", Timestamp = DateTime.Now },
+                new() { AcctID = "427222", Reason = "twitch/steeyo", Timestamp = DateTime.Now },
+                new() { AcctID = "1481309", Reason = "twitch/anton", Timestamp = DateTime.Now },
+                new() { AcctID = "364768", Reason = "twitch/hayz", Timestamp = DateTime.Now },
+                new() { AcctID = "4411189", Reason = "twitch/hayz (hc)", Timestamp = DateTime.Now },
+                new() { AcctID = "5353635", Reason = "twitch/stankrat", Timestamp = DateTime.Now },
+                new() { AcctID = "2614961", Reason = "twitch/oberst0m", Timestamp = DateTime.Now },
+                new() { AcctID = "6815534", Reason = "twitch/thatfriendlyguy", Timestamp = DateTime.Now },
+                new() { AcctID = "3441806", Reason = "twitch/JohnBBeta", Timestamp = DateTime.Now },
+                new() { AcctID = "2238335", Reason = "twitch/zchum", Timestamp = DateTime.Now },
+                new() { AcctID = "8016990", Reason = "twitch/mistofhazmat", Timestamp = DateTime.Now },
+                new() { AcctID = "858816", Reason = "twitch/hipperpyah", Timestamp = DateTime.Now },
+                new() { AcctID = "380648", Reason = "twitch/sektenspinner", Timestamp = DateTime.Now },
+                new() { AcctID = "408825", Reason = "twitch/bubbinger", Timestamp = DateTime.Now },
+                new() { AcctID = "2215415", Reason = "twitch/raggelton", Timestamp = DateTime.Now },
+                new() { AcctID = "2693789", Reason = "twitch/zcritic", Timestamp = DateTime.Now },
+                new() { AcctID = "9283718", Reason = "twitch/triple_g", Timestamp = DateTime.Now },
+                new() { AcctID = "546813", Reason = "twitch/pepp", Timestamp = DateTime.Now },
+                new() { AcctID = "4432653", Reason = "twitch/hexloom", Timestamp = DateTime.Now },
+                new() { AcctID = "9826933", Reason = "twitch/satsuki_hotaru", Timestamp = DateTime.Now },
+                new() { AcctID = "2699481", Reason = "twitch/headleyy", Timestamp = DateTime.Now },
+                new() { AcctID = "2366827", Reason = "twitch/thomaspaste", Timestamp = DateTime.Now },
+                new() { AcctID = "1699605", Reason = "twitch/taxfree_", Timestamp = DateTime.Now },
+                new() { AcctID = "5378845", Reason = "twitch/thePridgeTTV", Timestamp = DateTime.Now },
+                new() { AcctID = "564115", Reason = "twitch/ghostfreak66", Timestamp = DateTime.Now },
+                new() { AcctID = "5817655", Reason = "twitch/engineergod", Timestamp = DateTime.Now },
+                new() { AcctID = "479729", Reason = "twitch/WaitImCheating", Timestamp = DateTime.Now },
+                new() { AcctID = "860017", Reason = "twitch/Baddie", Timestamp = DateTime.Now },
+                new() { AcctID = "137994", Reason = "twitch/BaudT", Timestamp = DateTime.Now },
+                new() { AcctID = "11351038", Reason = "twitch/thruststv", Timestamp = DateTime.Now },
+                new() { AcctID = "8381705", Reason = "twitch/cubFPS", Timestamp = DateTime.Now },
+                new() { AcctID = "2997948", Reason = "twitch/sheefgg", Timestamp = DateTime.Now },
+                new() { AcctID = "4011779", Reason = "twitch/bearki", Timestamp = DateTime.Now },
+                new() { AcctID = "2011844", Reason = "twitch/jonk", Timestamp = DateTime.Now },
+                new() { AcctID = "5975690", Reason = "twitch/smojii", Timestamp = DateTime.Now },
+                new() { AcctID = "165994", Reason = "twitch/willerz", Timestamp = DateTime.Now },
+                new() { AcctID = "641616", Reason = "twitch/pestily", Timestamp = DateTime.Now },
+                new() { AcctID = "1090448", Reason = "youtube/@DrLupo", Timestamp = DateTime.Now },
+                new() { AcctID = "1448970", Reason = "twitch/glorious_e", Timestamp = DateTime.Now },
+                new() { AcctID = "1080203", Reason = "twitch/hyperrattv", Timestamp = DateTime.Now },
+                new() { AcctID = "1425172", Reason = "twitch/axel_tv", Timestamp = DateTime.Now },
+                new() { AcctID = "3928278", Reason = "twitch/aims", Timestamp = DateTime.Now },
+                new() { AcctID = "740807", Reason = "twitch/b_komhate", Timestamp = DateTime.Now },
+                new() { AcctID = "923361", Reason = "twitch/swid", Timestamp = DateTime.Now },
+                new() { AcctID = "790774", Reason = "twitch/thepoolshark", Timestamp = DateTime.Now },
+                new() { AcctID = "417327", Reason = "twitch/wishyvt", Timestamp = DateTime.Now },
+                new() { AcctID = "10769222", Reason = "twitch/oimatewtf", Timestamp = DateTime.Now },
+                new() { AcctID = "8711935", Reason = "twitch/snok3z", Timestamp = DateTime.Now },
+                new() { AcctID = "11404544", Reason = "twitch/suddenly_toast", Timestamp = DateTime.Now },
+                new() { AcctID = "9052642", Reason = "twitch/mogu_vtuber", Timestamp = DateTime.Now },
+                new() { AcctID = "5225682", Reason = "twitch/beibei69", Timestamp = DateTime.Now },
+                new() { AcctID = "1284057", Reason = "twitch/dobbykillstreak", Timestamp = DateTime.Now },
+                new() { AcctID = "11024278", Reason = "twitch/yago0795", Timestamp = DateTime.Now },
+                new() { AcctID = "2536192", Reason = "youtube/@Airwingmarine", Timestamp = DateTime.Now },
+            };
         }
-    }
 
-    /// <summary>
-    /// Settings for memory write based features.
-    /// </summary>
-    public sealed class MemWritesConfig
-    {
-        public bool Enabled { get; set; }
-        public bool NoRecoilEnabled { get; set; }
-        public float NoRecoilAmount { get; set; } = 80f;
-        public float NoSwayAmount { get; set; } = 80f;
-        public bool InfiniteStaminaEnabled { get; set; }
-        public bool MemoryAimEnabled { get; set; }
-        public Bones MemoryAimTargetBone { get; set; } = Bones.HumanHead;
-    }
-
-    /// <summary>
-    /// FilteredLoot Filter Config.
-    /// </summary>
-    public sealed class LootFilterConfig
-    {
-        /// <summary>
-        /// Currently selected filter.
-        /// </summary>
-        [JsonPropertyName("selected")]
-        public string Selected { get; set; } = "default";
-        /// <summary>
-        /// Filter Entries.
-        /// </summary>
-        [JsonInclude]
-        [JsonPropertyName("filters")]
-        public ConcurrentDictionary<string, UserLootFilter> Filters { get; private set; } = new() // Key is just a name, doesnt need to be case insensitive
-        {
-            ["default"] = new()
-        };
-    }
-
-    public sealed class AimviewWidgetConfig
-    {
-        /// <summary>
-        /// True if the Aimview Widget is enabled.
-        /// </summary>
-        [JsonPropertyName("enabled")]
-        public bool Enabled { get; set; } = true;
-
-        /// <summary>
-        /// True if the Aimview Widget is minimized.
-        /// </summary>
-        [JsonPropertyName("minimized")]
-        public bool Minimized { get; set; } = false;
-
-        /// <summary>
-        /// Aimview Location
-        /// </summary>
-        [JsonPropertyName("location")]
-        [JsonConverter(typeof(SKRectJsonConverter))]
-        public SKRect Location { get; set; }
-
-        /// <summary>
-        /// Show loot items in Aimview.
-        /// </summary>
-        [JsonPropertyName("showLoot")]
-        public bool ShowLoot { get; set; } = true;
-
-        /// <summary>
-        /// Show quest items in Aimview.
-        /// </summary>
-        [JsonPropertyName("showQuestItems")]
-        public bool ShowQuestItems { get; set; } = true;
-
-        /// <summary>
-        /// Show AI/Scavs in Aimview.
-        /// </summary>
-        [JsonPropertyName("showAI")]
-        public bool ShowAI { get; set; } = true;
-
-        /// <summary>
-        /// Show enemy players in Aimview.
-        /// </summary>
-        [JsonPropertyName("showEnemyPlayers")]
-        public bool ShowEnemyPlayers { get; set; } = true;
-
-        /// <summary>
-        /// Draw head circles for players and AI in Aimview.
-        /// </summary>
-        [JsonPropertyName("showHeadCircle")]
-        public bool ShowHeadCircle { get; set; } = false;
-
-        /// <summary>
-        /// Show wishlisted items in Aimview.
-        /// </summary>
-        [JsonPropertyName("showWishlisted")]
-        public bool ShowWishlisted { get; set; } = true;
-
-        /// <summary>
-        /// Show static containers in Aimview.
-        /// </summary>
-        [JsonPropertyName("showContainers")]
-        public bool ShowContainers { get; set; } = false;
-
-        /// <summary>
-        /// Maximum distance to draw containers in Aimview. 0 = unlimited.
-        /// </summary>
-        [JsonPropertyName("containerDistance")]
-        public float ContainerDistance { get; set; } = 100f;
-
-        /// <summary>
-        /// Show exfil points in Aimview. Distance is always unlimited (navigation-critical).
-        /// </summary>
-        [JsonPropertyName("showExfils")]
-        public bool ShowExfils { get; set; } = true;
-    }
-
-    public sealed class InfoWidgetConfig
-    {
-        /// <summary>
-        /// True if the Info Widget is enabled.
-        /// </summary>
-        [JsonPropertyName("enabled")]
-        public bool Enabled { get; set; } = true;
-
-        /// <summary>
-        /// True if the Info Widget is minimized.
-        /// </summary>
-        [JsonPropertyName("minimized")]
-        public bool Minimized { get; set; } = false;
-
-        /// <summary>
-        /// ESP Widget Location
-        /// </summary>
-        [JsonPropertyName("location")]
-        [JsonConverter(typeof(SKRectJsonConverter))]
-        public SKRect Location { get; set; }
-    }
-
-    public sealed class LootInfoWidgetConfig
-    {
-        /// <summary>
-        /// True if the Loot Info Widget is enabled.
-        /// </summary>
-        [JsonPropertyName("enabled")]
-        public bool Enabled { get; set; } = false;
-
-        /// <summary>
-        /// True if the Loot Info Widget is minimized.
-        /// </summary>
-        [JsonPropertyName("minimized")]
-        public bool Minimized { get; set; } = false;
-
-        /// <summary>
-        /// Loot Info Widget Location
-        /// </summary>
-        [JsonPropertyName("location")]
-        [JsonConverter(typeof(SKRectJsonConverter))]
-        public SKRect Location { get; set; }
-    }
-
-    public sealed class ProfileApiConfig
-    {
-        [JsonPropertyName("tarkovDev")]
-        [JsonInclude]
-        public TarkovDevConfig TarkovDev { get; private set; } = new();
-        [JsonPropertyName("eftApiTech")]
-        [JsonInclude]
-        public EftApiTechConfig EftApiTech { get; private set; } = new();
-    }
-
-    public sealed class TwitchApiConfig
-    {
-        [JsonPropertyName("clientId")]
-        public string ClientId { get; set; } = null;
-        [JsonPropertyName("clientSecret")]
-        public string ClientSecret { get; set; } = null;
-    }
-
-    public sealed class TarkovDevConfig
-    {
-        /// <summary>
-        /// Priority of this provider.
-        /// </summary>
-        [JsonPropertyName("priority_v2")]
-        public uint Priority { get; set; } = 1000;
-        /// <summary>
-        /// True if this provider is enabled, otherwise False.
-        /// </summary>
-        [JsonPropertyName("enabled")]
-        public bool Enabled { get; set; } = true;
-    }
-
-    public sealed class EftApiTechConfig
-    {
-        /// <summary>
-        /// Priority of this provider.
-        /// </summary>
-        [JsonPropertyName("priority")]
-        public uint Priority { get; set; } = 10;
-        /// <summary>
-        /// True if this provider is enabled, otherwise False.
-        /// </summary>
-        [JsonPropertyName("enabled")]
-        public bool Enabled { get; set; } = false;
-        /// <summary>
-        /// Number of requests per minute to this provider.
-        /// </summary>
-        [JsonPropertyName("requestsPerMinute")]
-        public int RequestsPerMinute { get; set; } = 5;
-        /// <summary>
-        /// API Key for eft-api.tech
-        /// </summary>
-        [JsonPropertyName("apiKey")]
-        public string ApiKey { get; set; } = null;
-    }
-
-    /// <summary>
-    /// Configuration for Web Radar.
-    /// </summary>
-    public sealed class WebRadarConfig
-    {
-        /// <summary>
-        /// True if UPnP should be enabled.
-        /// </summary>
-        [JsonPropertyName("upnp")]
-        public bool UPnP { get; set; } = true;
-        /// <summary>
-        /// IP to bind to.
-        /// </summary>
-        [JsonPropertyName("host")]
-        public string IP { get; set; } = "0.0.0.0";
-        /// <summary>
-        /// TCP Port to bind to.
-        /// </summary>
-        [JsonPropertyName("port")]
-        public string Port { get; set; } = Random.Shared.Next(50000, 60000).ToString();
-        /// <summary>
-        /// Server Tick Rate (Hz).
-        /// </summary>
-        [JsonPropertyName("tickRate")]
-        public string TickRate { get; set; } = "60";
-    }
-
-    /// <summary>
-    /// Quest Helper Configuration.
-    /// </summary>
-    public sealed class QuestHelperConfig
-    {
-        /// <summary>
-        /// True if the Quest Helper is enabled.
-        /// </summary>
-        [JsonPropertyName("enabled")]
-        public bool Enabled { get; set; } = true;
-
-        /// <summary>
-        /// True if quest locations should be shown on the radar.
-        /// </summary>
-        [JsonPropertyName("showLocations")]
-        public bool ShowLocations { get; set; } = true;
-
-        /// <summary>
-        /// True if Active Only mode is enabled (filters to active quests for current map when in raid).
-        /// </summary>
-        [JsonPropertyName("activeOnly")]
-        public bool ActiveOnly { get; set; } = false;
-
-        /// <summary>
-        /// True if Kappa Only filter is enabled (shows only Kappa-required quests).
-        /// </summary>
-        [JsonPropertyName("kappaOnly")]
-        public bool KappaOnly { get; set; } = false;
-
-        /// <summary>
-        /// True if Lightkeeper Only filter is enabled (shows only Lightkeeper quests).
-        /// </summary>
-        [JsonPropertyName("lightkeeperOnly")]
-        public bool LightkeeperOnly { get; set; } = false;
-
-        /// <summary>
-        /// Zone draw distance on radar (0 = unlimited).
-        /// </summary>
-        [JsonPropertyName("zoneDrawDistance")]
-        public float ZoneDrawDistance { get; set; } = 100f;
-
-        /// <summary>
-        /// True if the Quest Helper Widget is shown on the radar.
-        /// </summary>
-        [JsonPropertyName("showWidget")]
-        public bool ShowWidget { get; set; } = false;
-
-        /// <summary>
-        /// True if the Quest Helper Widget is minimized.
-        /// </summary>
-        [JsonPropertyName("widgetMinimized")]
-        public bool WidgetMinimized { get; set; } = false;
-
-        /// <summary>
-        /// Quest Helper Widget Location on radar.
-        /// </summary>
-        [JsonPropertyName("widgetLocation")]
-        [JsonConverter(typeof(SKRectJsonConverter))]
-        public SKRect WidgetLocation { get; set; }
-
-        /// <summary>
-        /// Set of tracked quest IDs (user-selected quests to track).
-        /// </summary>
-        [JsonPropertyName("trackedQuests")]
-        [JsonInclude]
-        public HashSet<string> TrackedQuests { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
-
-        /// <summary>
-        /// Blacklisted quest IDs (quests user doesn't want to track - used by LONE's QuestEntry).
-        /// </summary>
-        [JsonPropertyName("blacklistedQuests")]
-        [JsonInclude]
-        public ConcurrentDictionary<string, byte> BlacklistedQuests { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
+        #endregion
     }
 }

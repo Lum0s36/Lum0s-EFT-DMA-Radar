@@ -21,8 +21,8 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
     {
         private bool _isConnected;
         private string _deviceVersion = "Not Connected";
-        private List<Device.SerialDeviceInfo> _availableDevices;
-        private Device.SerialDeviceInfo _selectedDevice;
+        private List<SerialDeviceInfo> _availableDevices;
+        private SerialDeviceInfo _selectedDevice;
 
         public event PropertyChangedEventHandler PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string name = null) =>
@@ -57,7 +57,7 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
             }
         }
 
-        public List<Device.SerialDeviceInfo> AvailableDevices
+        public List<SerialDeviceInfo> AvailableDevices
         {
             get => _availableDevices;
             set
@@ -67,7 +67,7 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
             }
         }
 
-        public Device.SerialDeviceInfo SelectedDevice
+        public SerialDeviceInfo SelectedDevice
         {
             get => _selectedDevice;
             set

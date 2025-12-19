@@ -6,6 +6,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using LoneEftDmaRadar.UI.Radar.ViewModels;
+using LoneEftDmaRadar.UI.Radar.ViewModels.QuestHelper;
 
 namespace LoneEftDmaRadar.UI.Radar.Views
 {

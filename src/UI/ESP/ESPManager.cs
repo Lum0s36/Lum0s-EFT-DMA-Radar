@@ -69,8 +69,10 @@ namespace LoneEftDmaRadar.UI.ESP
         {
             if (!_isInitialized || _espWindow == null) Initialize();
             
+            if (_espWindow == null) return; // Safety check after Initialize
+            
             ESPWindow.ShowESP = true;
-            _espWindow?.Show();
+            _espWindow.Show();
             // Force Fullscreen
             if (_espWindow.WindowStyle != WindowStyle.None)
             {
@@ -80,7 +82,7 @@ namespace LoneEftDmaRadar.UI.ESP
             {
                 _espWindow.ApplyResolutionOverride();
             }
-            _espWindow?.RefreshESP();
+            _espWindow.RefreshESP();
         }
 
         public static void HideESP()

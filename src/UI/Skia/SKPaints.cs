@@ -1,719 +1,132 @@
 ﻿/*
  * Lone EFT DMA Radar
- * Brought to you by Lone (Lone DMA)
- * 
-MIT License
-
-Copyright (c) 2025 Lone DMA
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
- *
-*/
+ * MIT License - Copyright (c) 2025 Lone DMA
+ */
 
 namespace LoneEftDmaRadar.UI.Skia
 {
+    /// <summary>
+    /// Facade class providing backward compatibility for paint access.
+    /// Paints are organized into: SKPlayerPaints, SKLootPaints, SKWorldPaints, SKWidgetPaints
+    /// </summary>
     internal static class SKPaints
     {
         /// <summary>
         /// Gets an SKColorFilter that will reduce an image's brightness level.
         /// </summary>
-        /// <param name="brightnessFactor">Adjust this value between 0 (black) and 1 (original brightness), where values less than 1 reduce brightness</param>
-        /// <returns>SKColorFilter Object.</returns>
         public static SKColorFilter GetDarkModeColorFilter(float brightnessFactor)
         {
             float[] colorMatrix = {
-                brightnessFactor, 0, 0, 0, 0, // Red channel
-                0, brightnessFactor, 0, 0, 0, // Green channel
-                0, 0, brightnessFactor, 0, 0, // Blue channel
-                0, 0, 0, 1, 0, // Alpha channel
+                brightnessFactor, 0, 0, 0, 0,
+                0, brightnessFactor, 0, 0, 0,
+                0, 0, brightnessFactor, 0, 0,
+                0, 0, 0, 1, 0,
             };
             return SKColorFilter.CreateColorMatrix(colorMatrix);
         }
 
-        #region Radar Paints
+        #region Player Paints (delegate to SKPlayerPaints)
 
-        public static SKPaint PaintBitmap { get; } = new()
-        {
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintBitmapAlpha { get; } = new()
-        {
-            Color = SKColor.Empty.WithAlpha(SKConstants.BitmapAlphaValue),
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintConnectorGroup { get; } = new()
-        {
-            Color = SKColors.LawnGreen.WithAlpha(SKConstants.ConnectorGroupAlpha),
-            StrokeWidth = SKConstants.ConnectorStrokeWidth,
-            Style = SKPaintStyle.Stroke,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintMouseoverGroup { get; } = new()
-        {
-            Color = SKColors.LawnGreen,
-            StrokeWidth = SKConstants.PlayerStrokeWidth,
-            Style = SKPaintStyle.Stroke,
-            IsAntialias = true,
-            StrokeJoin = SKStrokeJoin.Round,
-            StrokeCap = SKStrokeCap.Round
-        };
-
-        public static SKPaint TextMouseoverGroup { get; } = new()
-        {
-            Color = SKColors.LawnGreen,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintLocalPlayer { get; } = new()
-        {
-            Color = SKColors.Green,
-            StrokeWidth = SKConstants.PlayerStrokeWidth,
-            Style = SKPaintStyle.Stroke,
-            IsAntialias = true,
-            StrokeJoin = SKStrokeJoin.Round,
-            StrokeCap = SKStrokeCap.Round
-        };
-
-        public static SKPaint TextLocalPlayer { get; } = new()
-        {
-            Color = SKColors.Green,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintTeammate { get; } = new()
-        {
-            Color = SKColors.LimeGreen,
-            StrokeWidth = SKConstants.PlayerStrokeWidth,
-            Style = SKPaintStyle.Stroke,
-            IsAntialias = true,
-            StrokeJoin = SKStrokeJoin.Round,
-            StrokeCap = SKStrokeCap.Round
-        };
-
-        public static SKPaint TextTeammate { get; } = new()
-        {
-            Color = SKColors.LimeGreen,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintPMC { get; } = new()
-        {
-            Color = SKColors.Red,
-            StrokeWidth = SKConstants.PlayerStrokeWidth,
-            Style = SKPaintStyle.Stroke,
-            IsAntialias = true,
-            StrokeJoin = SKStrokeJoin.Round,
-            StrokeCap = SKStrokeCap.Round
-        };
-
-        public static SKPaint TextPMC { get; } = new()
-        {
-            Color = SKColors.Red,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintPMCBear { get; } = new()
-        {
-            Color = SKColors.Red,
-            StrokeWidth = SKConstants.PlayerStrokeWidth,
-            Style = SKPaintStyle.Stroke,
-            IsAntialias = true,
-            StrokeJoin = SKStrokeJoin.Round,
-            StrokeCap = SKStrokeCap.Round
-        };
-
-        public static SKPaint TextPMCBear { get; } = new()
-        {
-            Color = SKColors.Red,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintPMCUsec { get; } = new()
-        {
-            Color = SKColors.Blue,
-            StrokeWidth = SKConstants.PlayerStrokeWidth,
-            Style = SKPaintStyle.Stroke,
-            IsAntialias = true,
-            StrokeJoin = SKStrokeJoin.Round,
-            StrokeCap = SKStrokeCap.Round
-        };
-
-        public static SKPaint TextPMCUsec { get; } = new()
-        {
-            Color = SKColors.Blue,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintWatchlist { get; } = new()
-        {
-            Color = SKColors.HotPink,
-            StrokeWidth = SKConstants.PlayerStrokeWidth,
-            Style = SKPaintStyle.Stroke,
-            IsAntialias = true,
-            StrokeJoin = SKStrokeJoin.Round,
-            StrokeCap = SKStrokeCap.Round
-        };
-
-        public static SKPaint TextWatchlist { get; } = new()
-        {
-            Color = SKColors.HotPink,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintStreamer { get; } = new()
-        {
-            Color = SKColors.MediumPurple,
-            StrokeWidth = SKConstants.PlayerStrokeWidth,
-            Style = SKPaintStyle.Stroke,
-            IsAntialias = true,
-            StrokeJoin = SKStrokeJoin.Round,
-            StrokeCap = SKStrokeCap.Round
-        };
-
-        public static SKPaint TextStreamer { get; } = new()
-        {
-            Color = SKColors.MediumPurple,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintScav { get; } = new()
-        {
-            Color = SKColors.Yellow,
-            StrokeWidth = SKConstants.PlayerStrokeWidth,
-            Style = SKPaintStyle.Stroke,
-            IsAntialias = true,
-            StrokeJoin = SKStrokeJoin.Round,
-            StrokeCap = SKStrokeCap.Round
-        };
-
-        public static SKPaint TextScav { get; } = new()
-        {
-            Color = SKColors.Yellow,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintRaider { get; } = new()
-        {
-            Color = SKColor.Parse(SKConstants.RaiderColorHex),
-            StrokeWidth = SKConstants.PlayerStrokeWidth,
-            Style = SKPaintStyle.Stroke,
-            IsAntialias = true,
-            StrokeJoin = SKStrokeJoin.Round,
-            StrokeCap = SKStrokeCap.Round
-        };
-
-        public static SKPaint TextRaider { get; } = new()
-        {
-            Color = SKColor.Parse(SKConstants.RaiderColorHex),
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintBoss { get; } = new()
-        {
-            Color = SKColors.Fuchsia,
-            StrokeWidth = SKConstants.PlayerStrokeWidth,
-            Style = SKPaintStyle.Stroke,
-            IsAntialias = true,
-            StrokeJoin = SKStrokeJoin.Round,
-            StrokeCap = SKStrokeCap.Round
-        };
-
-        public static SKPaint TextBoss { get; } = new()
-        {
-            Color = SKColors.Fuchsia,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintFocused { get; } = new()
-        {
-            Color = SKColors.Coral,
-            StrokeWidth = SKConstants.PlayerStrokeWidth,
-            Style = SKPaintStyle.Stroke,
-            IsAntialias = true,
-            StrokeJoin = SKStrokeJoin.Round,
-            StrokeCap = SKStrokeCap.Round
-        };
-
-        public static SKPaint TextFocused { get; } = new()
-        {
-            Color = SKColors.Coral,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintPScav { get; } = new()
-        {
-            Color = SKColors.White,
-            StrokeWidth = SKConstants.PlayerStrokeWidth,
-            Style = SKPaintStyle.Stroke,
-            IsAntialias = true,
-            StrokeJoin = SKStrokeJoin.Round,
-            StrokeCap = SKStrokeCap.Round
-        };
-
-        public static SKPaint TextPScav { get; } = new()
-        {
-            Color = SKColors.White,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint TextMouseover { get; } = new()
-        {
-            Color = SKColors.White,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintDeathMarker { get; } = new()
-        {
-            Color = SKColors.Black,
-            StrokeWidth = SKConstants.DeathMarkerStrokeWidth,
-            Style = SKPaintStyle.Stroke,
-            IsAntialias = true,
-        };
+        public static SKPaint PaintLocalPlayer => SKPlayerPaints.PaintLocalPlayer;
+        public static SKPaint TextLocalPlayer => SKPlayerPaints.TextLocalPlayer;
+        public static SKPaint PaintTeammate => SKPlayerPaints.PaintTeammate;
+        public static SKPaint TextTeammate => SKPlayerPaints.TextTeammate;
+        public static SKPaint PaintPMC => SKPlayerPaints.PaintPMC;
+        public static SKPaint TextPMC => SKPlayerPaints.TextPMC;
+        public static SKPaint PaintPMCBear => SKPlayerPaints.PaintPMCBear;
+        public static SKPaint TextPMCBear => SKPlayerPaints.TextPMCBear;
+        public static SKPaint PaintPMCUsec => SKPlayerPaints.PaintPMCUsec;
+        public static SKPaint TextPMCUsec => SKPlayerPaints.TextPMCUsec;
+        public static SKPaint PaintScav => SKPlayerPaints.PaintScav;
+        public static SKPaint TextScav => SKPlayerPaints.TextScav;
+        public static SKPaint PaintRaider => SKPlayerPaints.PaintRaider;
+        public static SKPaint TextRaider => SKPlayerPaints.TextRaider;
+        public static SKPaint PaintBoss => SKPlayerPaints.PaintBoss;
+        public static SKPaint TextBoss => SKPlayerPaints.TextBoss;
+        public static SKPaint PaintPScav => SKPlayerPaints.PaintPScav;
+        public static SKPaint TextPScav => SKPlayerPaints.TextPScav;
+        public static SKPaint PaintWatchlist => SKPlayerPaints.PaintWatchlist;
+        public static SKPaint TextWatchlist => SKPlayerPaints.TextWatchlist;
+        public static SKPaint PaintStreamer => SKPlayerPaints.PaintStreamer;
+        public static SKPaint TextStreamer => SKPlayerPaints.TextStreamer;
+        public static SKPaint PaintFocused => SKPlayerPaints.PaintFocused;
+        public static SKPaint TextFocused => SKPlayerPaints.TextFocused;
+        public static SKPaint PaintDeathMarker => SKPlayerPaints.PaintDeathMarker;
+        public static SKPaint TextMouseover => SKPlayerPaints.TextMouseover;
+        public static SKPaint PaintConnectorGroup => SKPlayerPaints.PaintConnectorGroup;
+        public static SKPaint PaintMouseoverGroup => SKPlayerPaints.PaintMouseoverGroup;
+        public static SKPaint TextMouseoverGroup => SKPlayerPaints.TextMouseoverGroup;
 
         #endregion
 
-        #region Loot Paints
-        public static SKPaint PaintLoot { get; } = new()
-        {
-            Color = SKColors.WhiteSmoke,
-            StrokeWidth = SKConstants.LootStrokeWidth,
-            Style = SKPaintStyle.Fill,
-            IsAntialias = true,
-        };
+        #region Loot Paints (delegate to SKLootPaints)
 
-        public static SKPaint PaintImportantLoot { get; } = new()
-        {
-            Color = SKColors.Turquoise,
-            StrokeWidth = SKConstants.LootStrokeWidth,
-            Style = SKPaintStyle.Fill,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintFilteredLoot { get; } = new()
-        {
-            Color = SKColors.MediumPurple,
-            StrokeWidth = SKConstants.LootStrokeWidth,
-            Style = SKPaintStyle.Fill,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintContainerLoot { get; } = new()
-        {
-            Color = SKColor.Parse(SKConstants.ContainerColorHex),
-            StrokeWidth = SKConstants.LootStrokeWidth,
-            Style = SKPaintStyle.Fill,
-            IsAntialias = true,
-        };
-
-        public static SKPaint TextLoot { get; } = new()
-        {
-            Color = SKColors.WhiteSmoke,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint TextImportantLoot { get; } = new()
-        {
-            Color = SKColors.Turquoise,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint TextFilteredLoot { get; } = new()
-        {
-            Color = SKColors.MediumPurple,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintCorpse { get; } = new()
-        {
-            Color = SKColors.Silver,
-            StrokeWidth = SKConstants.LootStrokeWidth,
-            Style = SKPaintStyle.Fill,
-            IsAntialias = true,
-        };
-
-        public static SKPaint TextCorpse { get; } = new()
-        {
-            Color = SKColors.Silver,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintMeds { get; } = new()
-        {
-            Color = SKColors.LightSalmon,
-            StrokeWidth = SKConstants.LootStrokeWidth,
-            Style = SKPaintStyle.Fill,
-            IsAntialias = true,
-        };
-
-        public static SKPaint TextMeds { get; } = new()
-        {
-            Color = SKColors.LightSalmon,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintFood { get; } = new()
-        {
-            Color = SKColors.CornflowerBlue,
-            StrokeWidth = SKConstants.LootStrokeWidth,
-            Style = SKPaintStyle.Fill,
-            IsAntialias = true,
-        };
-
-        public static SKPaint TextFood { get; } = new()
-        {
-            Color = SKColors.CornflowerBlue,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintBackpacks { get; } = new()
-        {
-            Color = SKColor.Parse(SKConstants.BackpackColorHex),
-            StrokeWidth = SKConstants.LootStrokeWidth,
-            Style = SKPaintStyle.Fill,
-            IsAntialias = true,
-        };
-
-        public static SKPaint TextBackpacks { get; } = new()
-        {
-            Color = SKColor.Parse(SKConstants.BackpackColorHex),
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint QuestHelperPaint { get; } = new()
-        {
-            Color = SKColors.DeepPink,
-            StrokeWidth = SKConstants.LootStrokeWidth,
-            Style = SKPaintStyle.Fill,
-            IsAntialias = true,
-        };
-        public static SKPaint QuestHelperText { get; } = new()
-        {
-            Color = SKColors.DeepPink,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintQuestItem { get; } = new()
-        {
-            Color = SKColors.YellowGreen,
-            StrokeWidth = SKConstants.LootStrokeWidth,
-            Style = SKPaintStyle.Fill,
-            IsAntialias = true,
-        };
-
-        public static SKPaint TextQuestItem { get; } = new()
-        {
-            Color = SKColors.YellowGreen,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintWishlistItem { get; } = new()
-        {
-            Color = SKColors.Red,
-            StrokeWidth = SKConstants.LootStrokeWidth,
-            Style = SKPaintStyle.Fill,
-            IsAntialias = true,
-        };
-
-        public static SKPaint TextWishlistItem { get; } = new()
-        {
-            Color = SKColors.Red,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintQuestZone { get; } = new()
-        {
-            Color = SKColors.Yellow,
-            StrokeWidth = SKConstants.QuestZoneStrokeWidth,
-            Style = SKPaintStyle.Fill,
-            IsAntialias = true,
-        };
-
-        public static SKPaint TextQuestZone { get; } = new()
-        {
-            Color = SKColors.Yellow,
-            IsStroke = false,
-#pragma warning disable CS0618 // Type or member is obsolete - TextSize/TextEncoding still work in current SkiaSharp
-            TextSize = SKConstants.QuestZoneTextSize,
-            TextEncoding = SKTextEncoding.Utf8,
-#pragma warning restore CS0618
-            IsAntialias = true,
-        };
+        public static SKPaint PaintLoot => SKLootPaints.PaintLoot;
+        public static SKPaint TextLoot => SKLootPaints.TextLoot;
+        public static SKPaint PaintImportantLoot => SKLootPaints.PaintImportantLoot;
+        public static SKPaint TextImportantLoot => SKLootPaints.TextImportantLoot;
+        public static SKPaint PaintFilteredLoot => SKLootPaints.PaintFilteredLoot;
+        public static SKPaint TextFilteredLoot => SKLootPaints.TextFilteredLoot;
+        public static SKPaint PaintContainerLoot => SKLootPaints.PaintContainerLoot;
+        public static SKPaint PaintCorpse => SKLootPaints.PaintCorpse;
+        public static SKPaint TextCorpse => SKLootPaints.TextCorpse;
+        public static SKPaint PaintMeds => SKLootPaints.PaintMeds;
+        public static SKPaint TextMeds => SKLootPaints.TextMeds;
+        public static SKPaint PaintFood => SKLootPaints.PaintFood;
+        public static SKPaint TextFood => SKLootPaints.TextFood;
+        public static SKPaint PaintBackpacks => SKLootPaints.PaintBackpacks;
+        public static SKPaint TextBackpacks => SKLootPaints.TextBackpacks;
+        public static SKPaint PaintQuestItem => SKLootPaints.PaintQuestItem;
+        public static SKPaint TextQuestItem => SKLootPaints.TextQuestItem;
+        public static SKPaint PaintWishlistItem => SKLootPaints.PaintWishlistItem;
+        public static SKPaint TextWishlistItem => SKLootPaints.TextWishlistItem;
+        public static SKPaint QuestHelperPaint => SKLootPaints.QuestHelperPaint;
+        public static SKPaint QuestHelperText => SKLootPaints.QuestHelperText;
+        public static SKPaint PaintQuestZone => SKLootPaints.PaintQuestZone;
+        public static SKPaint TextQuestZone => SKLootPaints.TextQuestZone;
 
         #endregion
 
-        #region Render/Misc Paints
+        #region World Paints (delegate to SKWorldPaints)
 
-        public static SKPaint PaintTransparentBacker { get; } = new()
-        {
-            Color = SKColors.Black.WithAlpha(SKConstants.TransparentBackerAlpha),
-            StrokeWidth = SKConstants.LootStrokeWidth,
-            Style = SKPaintStyle.Fill
-        };
-
-        public static SKPaint TextRadarStatus { get; } = new()
-        {
-            Color = SKColors.Red,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint TextStatusSmall { get; } = new SKPaint
-        {
-            Color = SKColors.Red,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintExplosives { get; } = new()
-        {
-            Color = SKColors.OrangeRed,
-            StrokeWidth = SKConstants.ExplosiveStrokeWidth,
-            Style = SKPaintStyle.Stroke,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintExfilOpen { get; } = new()
-        {
-            Color = SKColors.LimeGreen,
-            StrokeWidth = SKConstants.LootStrokeWidth,
-            Style = SKPaintStyle.Fill,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintExfilPending { get; } = new()
-        {
-            Color = SKColors.Yellow,
-            StrokeWidth = SKConstants.LootStrokeWidth,
-            Style = SKPaintStyle.Fill,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintExfilClosed { get; } = new()
-        {
-            Color = SKColors.Red.WithAlpha(SKConstants.ExfilClosedAlpha),
-            StrokeWidth = SKConstants.LootStrokeWidth,
-            Style = SKPaintStyle.Fill,
-            IsAntialias = true,
-        };
-
-        public static SKPaint TextExfil { get; } = new()
-        {
-            Color = SKColors.White,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintHazard { get; } = new()
-        {
-            Color = SKColors.OrangeRed,
-            StrokeWidth = SKConstants.HazardStrokeWidth,
-            Style = SKPaintStyle.Stroke,
-            IsAntialias = true,
-        };
-
-        public static SKPaint TextHazard { get; } = new()
-        {
-            Color = SKColors.OrangeRed,
-            IsStroke = false,
-            IsAntialias = true,
-        };
-
-        public static SKPaint PaintExfilTransit { get; } = new()
-        {
-            Color = SKColors.Orange,
-            StrokeWidth = SKConstants.LootStrokeWidth,
-            Style = SKPaintStyle.Fill,
-            IsAntialias = true,
-        };
-
-        public static SKPaint TextOutline { get; } = new()
-        {
-            IsAntialias = true,
-            Color = SKColors.Black,
-            IsStroke = true,
-            StrokeWidth = SKConstants.TextOutlineStrokeWidth,
-            Style = SKPaintStyle.Stroke,
-        };
-
-        /// <summary>
-        /// Only utilize this paint on the Radar UI Thread. StrokeWidth is modified prior to each draw call.
-        /// *NOT* Thread safe to use!
-        /// </summary>
-        public static SKPaint ShapeOutline { get; } = new()
-        {
-            Color = SKColors.Black,
-            /*StrokeWidth = ??,*/ // Compute before use
-            Style = SKPaintStyle.Stroke,
-            IsAntialias = true,
-        };
+        public static SKPaint PaintExfilOpen => SKWorldPaints.PaintExfilOpen;
+        public static SKPaint PaintExfilPending => SKWorldPaints.PaintExfilPending;
+        public static SKPaint PaintExfilClosed => SKWorldPaints.PaintExfilClosed;
+        public static SKPaint PaintExfilTransit => SKWorldPaints.PaintExfilTransit;
+        public static SKPaint TextExfil => SKWorldPaints.TextExfil;
+        public static SKPaint PaintExplosives => SKWorldPaints.PaintExplosives;
+        public static SKPaint PaintHazard => SKWorldPaints.PaintHazard;
+        public static SKPaint TextHazard => SKWorldPaints.TextHazard;
+        public static SKPaint PaintBitmap => SKWorldPaints.PaintBitmap;
+        public static SKPaint PaintBitmapAlpha => SKWorldPaints.PaintBitmapAlpha;
+        public static SKPaint PaintTransparentBacker => SKWorldPaints.PaintTransparentBacker;
+        public static SKPaint TextRadarStatus => SKWorldPaints.TextRadarStatus;
+        public static SKPaint TextStatusSmall => SKWorldPaints.TextStatusSmall;
+        public static SKPaint TextOutline => SKWorldPaints.TextOutline;
+        public static SKPaint ShapeOutline => SKWorldPaints.ShapeOutline;
 
         #endregion
 
-        #region Player Info Widget Paints
+        #region Widget Paints (delegate to SKWidgetPaints)
 
-        public static SKPaint TextPlayersOverlay { get; } = new()
-        {
-            Color = SKColors.White,
-            IsStroke = false,
-            IsAntialias = true
-        };
-
-        public static SKPaint TextPlayersOverlayPMC { get; } = new()
-        {
-            IsStroke = false,
-            IsAntialias = true
-        };
-
-        public static SKPaint TextPlayersOverlayPScav { get; } = new()
-        {
-            IsStroke = false,
-            IsAntialias = true
-        };
-
-        public static SKPaint TextPlayersOverlayStreamer { get; } = new()
-        {
-            IsStroke = false,
-            IsAntialias = true
-        };
-
-        public static SKPaint TextPlayersOverlaySpecial { get; } = new()
-        {
-            IsStroke = false,
-            IsAntialias = true
-        };
-
-        public static SKPaint TextPlayersOverlayFocused { get; } = new()
-        {
-            IsStroke = false,
-            IsAntialias = true
-        };
+        public static SKPaint TextPlayersOverlay => SKWidgetPaints.TextPlayersOverlay;
+        public static SKPaint TextPlayersOverlayPMC => SKWidgetPaints.TextPlayersOverlayPMC;
+        public static SKPaint TextPlayersOverlayPScav => SKWidgetPaints.TextPlayersOverlayPScav;
+        public static SKPaint TextPlayersOverlayStreamer => SKWidgetPaints.TextPlayersOverlayStreamer;
+        public static SKPaint TextPlayersOverlaySpecial => SKWidgetPaints.TextPlayersOverlaySpecial;
+        public static SKPaint TextPlayersOverlayFocused => SKWidgetPaints.TextPlayersOverlayFocused;
+        public static SKPaint PaintAimviewWidgetCrosshair => SKWidgetPaints.PaintAimviewWidgetCrosshair;
+        public static SKPaint PaintAimviewWidgetLocalPlayer => SKWidgetPaints.PaintAimviewWidgetLocalPlayer;
+        public static SKPaint PaintAimviewWidgetPMC => SKWidgetPaints.PaintAimviewWidgetPMC;
+        public static SKPaint PaintAimviewWidgetWatchlist => SKWidgetPaints.PaintAimviewWidgetWatchlist;
+        public static SKPaint PaintAimviewWidgetStreamer => SKWidgetPaints.PaintAimviewWidgetStreamer;
+        public static SKPaint PaintAimviewWidgetTeammate => SKWidgetPaints.PaintAimviewWidgetTeammate;
+        public static SKPaint PaintAimviewWidgetBoss => SKWidgetPaints.PaintAimviewWidgetBoss;
+        public static SKPaint PaintAimviewWidgetScav => SKWidgetPaints.PaintAimviewWidgetScav;
+        public static SKPaint PaintAimviewWidgetRaider => SKWidgetPaints.PaintAimviewWidgetRaider;
+        public static SKPaint PaintAimviewWidgetPScav => SKWidgetPaints.PaintAimviewWidgetPScav;
+        public static SKPaint PaintAimviewWidgetFocused => SKWidgetPaints.PaintAimviewWidgetFocused;
 
         #endregion
-
-        #region ESP Widget Paints
-
-        public static SKPaint PaintAimviewWidgetCrosshair { get; } = new()
-        {
-            Color = SKColors.White,
-            StrokeWidth = SKConstants.ESPStrokeWidth,
-            Style = SKPaintStyle.Stroke,
-            IsAntialias = true
-        };
-
-        public static SKPaint PaintAimviewWidgetLocalPlayer { get; } = new()
-        {
-            Color = SKColors.Green,
-            StrokeWidth = SKConstants.ESPStrokeWidth,
-            Style = SKPaintStyle.Stroke
-        };
-
-        public static SKPaint PaintAimviewWidgetPMC { get; } = new()
-        {
-            Color = SKColors.Red,
-            StrokeWidth = SKConstants.ESPStrokeWidth,
-            Style = SKPaintStyle.Stroke
-        };
-
-        public static SKPaint PaintAimviewWidgetWatchlist { get; } = new()
-        {
-            Color = SKColors.HotPink,
-            StrokeWidth = SKConstants.ESPStrokeWidth,
-            Style = SKPaintStyle.Stroke
-        };
-
-        public static SKPaint PaintAimviewWidgetStreamer { get; } = new()
-        {
-            Color = SKColors.MediumPurple,
-            StrokeWidth = SKConstants.ESPStrokeWidth,
-            Style = SKPaintStyle.Stroke
-        };
-
-        public static SKPaint PaintAimviewWidgetTeammate { get; } = new()
-        {
-            Color = SKColors.LimeGreen,
-            StrokeWidth = SKConstants.ESPStrokeWidth,
-            Style = SKPaintStyle.Stroke
-        };
-
-        public static SKPaint PaintAimviewWidgetBoss { get; } = new()
-        {
-            Color = SKColors.Fuchsia,
-            StrokeWidth = SKConstants.ESPStrokeWidth,
-            Style = SKPaintStyle.Stroke
-        };
-
-        public static SKPaint PaintAimviewWidgetScav { get; } = new()
-        {
-            Color = SKColors.Yellow,
-            StrokeWidth = SKConstants.ESPStrokeWidth,
-            Style = SKPaintStyle.Stroke
-        };
-
-        public static SKPaint PaintAimviewWidgetRaider { get; } = new()
-        {
-            Color = SKColor.Parse(SKConstants.RaiderColorHex),
-            StrokeWidth = SKConstants.ESPStrokeWidth,
-            Style = SKPaintStyle.Stroke
-        };
-
-        public static SKPaint PaintAimviewWidgetPScav { get; } = new()
-        {
-            Color = SKColors.White,
-            StrokeWidth = SKConstants.ESPStrokeWidth,
-            Style = SKPaintStyle.Stroke
-        };
-
-        public static SKPaint PaintAimviewWidgetFocused { get; } = new()
-        {
-            Color = SKColors.Coral,
-            StrokeWidth = SKConstants.ESPStrokeWidth,
-            Style = SKPaintStyle.Stroke
-        };
-
-        #endregion
-
     }
 }

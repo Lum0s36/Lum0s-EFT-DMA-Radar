@@ -71,7 +71,7 @@ namespace LoneEftDmaRadar.DMA
             bool haveWin32 = _input is not null && useGamePCInput;
 
             // Update Win32 state if backend is present and we're using Game PC mode.
-            if (haveWin32)
+            if (haveWin32 && _input is not null)
             {
                 try
                 {
@@ -95,7 +95,7 @@ namespace LoneEftDmaRadar.DMA
                 bool isDownLocal = false;
 
                 // Check Game PC input (via DMA) if in Game PC mode
-                if (haveWin32 && useGamePCInput)
+                if (haveWin32 && useGamePCInput && _input is not null)
                 {
                     try
                     {
