@@ -16,15 +16,11 @@ This app has been tested on 🪟 Windows 11 25H2 (Game) and 🪟 Windows 11 23H2
 **Note:** All current testing is done with both the radar and game running at **1920x1080** resolution.  
 
 ## Things I won't touch unless Mambo/x0m made it open source
-- writing
+- writing --> I am thinking of deleting it entirely until further notice.
+- external device support --> I am thinking of deleting it entirely until further notice.
 
 ## Features that are to be added in future commits ⌨️
 
-- Exfils show if open, pending or closed
-- Quest Helper (basic)
-   - Quest tracker including zones, req. Keys and Items and only Q_items of active quests on radar/ESP/Aimview
-   - Quest tracker widget on Radar
-- toggable Radar/Mini map in ESP
 - ...?
 
 ## Known Issues 🚨
@@ -35,12 +31,7 @@ This app has been tested on 🪟 Windows 11 25H2 (Game) and 🪟 Windows 11 23H2
 
 - Configurable Aimview widget
 - Loot Info widget
-- 🛰️ ESP Fuser DX9 overlay
-   - ESP has issues, especially when ADS and using optics. Work in progress 🛠
-- 🎯 Device Aimbot / Kmbox integration
-- 🕵️‍♂️ Silent aim (memory aim)
-- 💪 No recoil, no sway, and infinite stamina
-- 🧼 Clean UI
+- Quest Helper and Widget
 
 ## Config File 📄
 
