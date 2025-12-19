@@ -359,74 +359,20 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
 
         private ValueTuple<SKPaint, SKPaint> GetPaints()
         {
-            if (IsQuestItem)
-                return new(SKPaints.PaintQuestItem, SKPaints.TextQuestItem);
-            // Wishlist takes priority over custom filters
-            if (IsWishlisted)
-                return new(SKPaints.PaintWishlistItem, SKPaints.TextWishlistItem);
-            if (LootFilter.ShowBackpacks && IsBackpack)
-                return new(SKPaints.PaintBackpacks, SKPaints.TextBackpacks);
-            if (LootFilter.ShowMeds && IsMeds)
-                return new(SKPaints.PaintMeds, SKPaints.TextMeds);
-            if (LootFilter.ShowFood && IsFood)
-                return new(SKPaints.PaintFood, SKPaints.TextFood);
-            var filterColor = CustomFilter?.Color;
-            if (!string.IsNullOrEmpty(filterColor))
-            {
-                var filterPaints = GetFilterPaints(filterColor);
-                return new(filterPaints.Item1, filterPaints.Item2);
-            }
-            if (IsValuableLoot || this is LootAirdrop)
-                return new(SKPaints.PaintImportantLoot, SKPaints.TextImportantLoot);
-            return new(SKPaints.PaintLoot, SKPaints.TextLoot);
+            // Use shared LootVisibilityHelper for consistent color logic
+            var paints = LootVisibilityHelper.GetSkPaints(this);
+            return new(paints.shape, paints.text);
         }
 
         #region Custom Loot Paints
-        private static readonly ConcurrentDictionary<string, Tuple<SKPaint, SKPaint>> _paints = new();
-
+        
         /// <summary>
-        /// Returns the Paints for this color value.
+        /// Scale loot filter paints when UI scale changes.
+        /// Delegates to LootVisibilityHelper for shared paint cache.
         /// </summary>
-        /// <param name="color">Color rgba hex string.</param>
-        /// <returns>Tuple of paints. Item1 = Paint, Item2 = Text. Item3 = ESP Paint, Item4 = ESP Text</returns>
-        private static Tuple<SKPaint, SKPaint> GetFilterPaints(string color)
-        {
-            if (!SKColor.TryParse(color, out var skColor))
-                return new Tuple<SKPaint, SKPaint>(SKPaints.PaintLoot, SKPaints.TextLoot);
-
-            var result = _paints.AddOrUpdate(color,
-                key =>
-                {
-                    var paint = new SKPaint
-                    {
-                        Color = skColor,
-                        StrokeWidth = LootConstants.FilterPaintStrokeWidth * App.Config.UI.UIScale,
-                        Style = SKPaintStyle.Fill,
-                        IsAntialias = true
-                    };
-                    var text = new SKPaint
-                    {
-                        Color = skColor,
-                        IsStroke = false,
-                        IsAntialias = true
-                    };
-                    return new Tuple<SKPaint, SKPaint>(paint, text);
-                },
-                (key, existingValue) =>
-                {
-                    existingValue.Item1.StrokeWidth = LootConstants.FilterPaintStrokeWidth * App.Config.UI.UIScale;
-                    return existingValue;
-                });
-
-            return result;
-        }
-
         public static void ScaleLootPaints(float newScale)
         {
-            foreach (var paint in _paints)
-            {
-                paint.Value.Item1.StrokeWidth = LootConstants.FilterPaintStrokeWidth * newScale;
-            }
+            LootVisibilityHelper.ScaleFilterPaints(newScale);
         }
 
         #endregion
