@@ -30,6 +30,7 @@ using Collections.Pooled;
 using LoneEftDmaRadar.Tarkov.GameWorld.Player;
 using LoneEftDmaRadar.Tarkov.GameWorld.Player.Helpers;
 using LoneEftDmaRadar.Tarkov.Unity.Structures;
+using LoneEftDmaRadar.UI.Loot;
 using LoneEftDmaRadar.UI.Radar.Maps;
 using LoneEftDmaRadar.UI.Radar.ViewModels;
 using LoneEftDmaRadar.UI.Skia;
@@ -185,16 +186,25 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
                 }
             }
 
-            // Then look for important items from loot filters
+            // Then look for valuable items (price >= MinValueValuable)
+            // Note: Custom filter items do NOT get !!! - only truly valuable items do
+            int minValueValuable = App.Config.Loot.MinValueValuable;
             foreach (var item in obs.Equipment.Items.Values)
             {
-                if (item.Important)
+                // Calculate item price
+                long price = App.Config.Loot.PriceMode == LootPriceMode.FleaMarket 
+                    ? item.FleaPrice 
+                    : item.TraderPrice;
+                if (price <= 0)
+                    price = Math.Max(item.FleaPrice, item.TraderPrice);
+                
+                if (price >= minValueValuable)
                 {
                     return new CorpseImportantItem
                     {
                         Label = $"!!! {item.ShortName}",
                         Type = CorpseImportantItemType.ImportantFilter,
-                        CustomFilterColor = item.CustomFilter?.Color
+                        CustomFilterColor = null // Use default ValuableLoot color
                     };
                 }
             }
@@ -220,8 +230,11 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
             if (Player is not ObservedPlayer obs || obs.Equipment?.Items is null)
                 yield break;
 
+            int minValueValuable = App.Config.Loot.MinValueValuable;
+
             foreach (var item in obs.Equipment.Items.Values)
             {
+                // Wishlist items get "!!"
                 if (LocalPlayer.WishlistItems.Contains(item.BsgId))
                 {
                     yield return new CorpseImportantItem
@@ -231,14 +244,25 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
                         CustomFilterColor = null
                     };
                 }
-                else if (item.Important)
+                else
                 {
-                    yield return new CorpseImportantItem
+                    // Valuable items (price >= MinValueValuable) get "!!!"
+                    // Custom filter items do NOT get !!! automatically
+                    long price = App.Config.Loot.PriceMode == LootPriceMode.FleaMarket 
+                        ? item.FleaPrice 
+                        : item.TraderPrice;
+                    if (price <= 0)
+                        price = Math.Max(item.FleaPrice, item.TraderPrice);
+                    
+                    if (price >= minValueValuable)
                     {
-                        Label = $"!!! {item.ShortName}",
-                        Type = CorpseImportantItemType.ImportantFilter,
-                        CustomFilterColor = item.CustomFilter?.Color
-                    };
+                        yield return new CorpseImportantItem
+                        {
+                            Label = $"!!! {item.ShortName}",
+                            Type = CorpseImportantItemType.ImportantFilter,
+                            CustomFilterColor = null // Use default ValuableLoot color
+                        };
+                    }
                 }
             }
         }

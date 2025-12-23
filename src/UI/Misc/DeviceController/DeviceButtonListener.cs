@@ -12,6 +12,7 @@ namespace LoneEftDmaRadar.UI.Misc
     {
         private static Thread _buttonInputThread;
         private static bool _runReader = false;
+        private static byte _lastButtonState = 0;
 
         public static void StartListening()
         {
@@ -37,7 +38,7 @@ namespace LoneEftDmaRadar.UI.Misc
         {
             await Task.Run(() =>
             {
-                DebugLogger.LogDebug("[+] Listening to device.");
+                DebugLogger.LogDebug("[+] Listening to device buttons.");
                 while (_runReader)
                 {
                     if (!Device.connected || DeviceConnection.Port == null)
@@ -56,6 +57,13 @@ namespace LoneEftDmaRadar.UI.Misc
                                 continue;
 
                             byte b = (byte)data;
+                            
+                            // Log state changes
+                            if (b != _lastButtonState)
+                            {
+                                DebugLogger.LogDebug($"[DeviceButtonListener] Button state changed: 0x{_lastButtonState:X2} -> 0x{b:X2}");
+                                _lastButtonState = b;
+                            }
 
                             for (int i = 1; i <= DeviceControllerConstants.MouseButtonCount; i++)
                                 Device.bState[i] = (b & (1 << (i - 1))) != 0;
@@ -67,8 +75,9 @@ namespace LoneEftDmaRadar.UI.Misc
                             Thread.Sleep(1);
                         }
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        DebugLogger.LogDebug($"[DeviceButtonListener] Error: {ex.Message}");
                         Device.connected = false;
                         Thread.Sleep(DeviceControllerConstants.ButtonReaderExceptionDelayMs);
                     }

@@ -114,18 +114,51 @@ namespace LoneEftDmaRadar.DMA
                     isDownLocal = IsLocalKeyDown(vk);
                 }
 
-                // DeviceAimbot and mouse fallback work in both modes as they're local
+                // DeviceAimbot (serial) button state - works with Makcu/KMBox serial connection
+                // This provides button feedback from the device connected to Game PC
                 bool isDownDeviceAimbot = IsDeviceAimbotKeyDown(vk);
-                bool isDownMouseFallback = IsMouseVirtualKey(vk) && IsMouseAsyncDown(vk);
+                
+                // Mouse fallback: check local mouse on Radar PC
+                // Only used in Radar PC mode, not in Game PC mode
+                bool isDownMouseFallback = false;
+                if (useRadarPCInput && IsMouseVirtualKey(vk))
+                {
+                    isDownMouseFallback = IsMouseAsyncDown(vk);
+                }
 
                 // FINAL state: key is considered down if any active backend reports it.
-                // In Radar PC mode: use local input + DeviceAimbot/mouse fallback
-                // In Game PC mode: use DMA input + DeviceAimbot/mouse fallback
-                bool isKeyDown = isDownWin32 || isDownLocal || isDownDeviceAimbot || isDownMouseFallback;
+                // Priority for mouse buttons in Game PC mode:
+                // 1. Device serial connection (Makcu/KMBox) - if connected
+                // 2. VmmInputManager (DMA read from Game PC)
+                bool isKeyDown;
+                if (useGamePCInput && IsMouseVirtualKey(vk) && Device.connected)
+                {
+                    // For mouse buttons in Game PC mode with device connected,
+                    // prefer device button state as it's more reliable
+                    isKeyDown = isDownDeviceAimbot;
+                }
+                else
+                {
+                    isKeyDown = isDownWin32 || isDownLocal || isDownDeviceAimbot || isDownMouseFallback;
+                }
+
+                // Debug logging for Engage Aimbot hotkey (log state changes only)
+                if (action.Name == "Engage Aimbot")
+                {
+                    bool currentState = isKeyDown;
+                    if (_lastEngageState != currentState)
+                    {
+                        DebugLogger.LogDebug($"[InputManager] Engage Aimbot STATE CHANGE: Win32={isDownWin32}, Local={isDownLocal}, Device={isDownDeviceAimbot}, MouseFallback={isDownMouseFallback} => isKeyDown={isKeyDown} (Mode={inputMode}, DeviceConnected={Device.connected})");
+                        _lastEngageState = currentState;
+                    }
+                }
 
                 action.Execute(isKeyDown);
             }
         }
+        
+        // Track last state for debug logging
+        private bool _lastEngageState = false;
 
         /// <summary>
         /// Maps some Win32 virtual keys (mouse buttons) to DeviceAimbot buttons

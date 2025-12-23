@@ -29,6 +29,7 @@ SOFTWARE.
 using Collections.Pooled;
 using LoneEftDmaRadar.Misc;
 using LoneEftDmaRadar.Tarkov.GameWorld.Loot;
+using LoneEftDmaRadar.Tarkov.GameWorld.Loot.Helpers;
 using SkiaSharp.Views.WPF;
 
 namespace LoneEftDmaRadar.UI.Skia
@@ -43,6 +44,8 @@ namespace LoneEftDmaRadar.UI.Skia
             public string Name { get; set; }
             public int Value { get; set; }
             public int Count { get; set; }
+            public LootColorType ColorType { get; set; }
+            public string CustomFilterColor { get; set; }
         }
 
         private float _scrollOffset = 0f;
@@ -114,7 +117,9 @@ namespace LoneEftDmaRadar.UI.Skia
                         {
                             Name = name,
                             Value = item.Price,
-                            Count = 1
+                            Count = 1,
+                            ColorType = LootVisibilityHelper.GetLootColorType(item),
+                            CustomFilterColor = LootVisibilityHelper.GetCustomFilterColor(item)
                         };
                     }
                 }
@@ -215,7 +220,7 @@ namespace LoneEftDmaRadar.UI.Skia
                 if (drawPt.Y > ClientRectangle.Bottom)
                     break;
 
-                var paint = GetPaintForValue(entry.Value);
+                var paint = GetPaintForEntry(entry);
 
                 canvas.DrawText(entry.Name, new SKPoint(itemX, drawPt.Y), SKTextAlign.Left, font, paint);
                 canvas.DrawText(Utilities.FormatNumberKM(entry.Value), new SKPoint(valueX, drawPt.Y), SKTextAlign.Left, font, paint);
@@ -284,15 +289,45 @@ namespace LoneEftDmaRadar.UI.Skia
             Scroll(scrollAmount);
         }
 
-        private static SKPaint GetPaintForValue(int value)
+        /// <summary>
+        /// Gets the paint for a loot entry using the same color logic as Radar/ESP.
+        /// </summary>
+        private static SKPaint GetPaintForEntry(LootEntry entry)
         {
-            // Color code based on value thresholds
-            if (value >= App.Config.Loot.MinValueValuable)
-                return SKPaints.TextPlayersOverlaySpecial; // High value
-            else if (value >= App.Config.Loot.MinValue)
-                return SKPaints.TextPlayersOverlayPMC; // Medium value
-            else
-                return SKPaints.TextPlayersOverlay; // Low value
+            return entry.ColorType switch
+            {
+                LootColorType.Quest => SKPaints.TextQuestItem,
+                LootColorType.Wishlist => SKPaints.TextWishlistItem,
+                LootColorType.CustomFilter => GetCustomFilterPaint(entry.CustomFilterColor),
+                LootColorType.Important => SKPaints.TextImportantLoot,
+                LootColorType.Backpack => SKPaints.TextBackpacks,
+                LootColorType.Meds => SKPaints.TextMeds,
+                LootColorType.Food => SKPaints.TextFood,
+                _ => SKPaints.TextLoot
+            };
+        }
+
+        // Cache for custom filter paints in widget
+        private static readonly ConcurrentDictionary<string, SKPaint> _customFilterPaintCache = new();
+
+        private static SKPaint GetCustomFilterPaint(string colorHex)
+        {
+            if (string.IsNullOrEmpty(colorHex))
+                return SKPaints.TextImportantLoot;
+
+            return _customFilterPaintCache.GetOrAdd(colorHex, hex =>
+            {
+                if (SKColor.TryParse(hex, out var skColor))
+                {
+                    return new SKPaint
+                    {
+                        Color = skColor,
+                        IsStroke = false,
+                        IsAntialias = true
+                    };
+                }
+                return SKPaints.TextImportantLoot;
+            });
         }
 
         public override void SetScaleFactor(float newScale)

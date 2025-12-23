@@ -16,6 +16,12 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player.Helpers
         private readonly ConcurrentDictionary<string, TarkovMarketItem> _items = new(StringComparer.OrdinalIgnoreCase);
         private readonly ObservedPlayer _player;
         private bool _inited;
+        
+        // Track last known item IDs per slot to detect changes
+        private readonly ConcurrentDictionary<string, string> _lastItemIds = new(StringComparer.OrdinalIgnoreCase);
+        
+        // Track item version numbers to detect when items are removed from corpses
+        private readonly ConcurrentDictionary<string, int> _itemVersions = new(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
         /// Player's eqiuipped gear by slot.
@@ -90,7 +96,11 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player.Helpers
                     if (containedItemPtr == 0 || !MemDMA.IsValidVirtualAddress(containedItemPtr))
                     {
                         // Slot is empty - remove any cached item
-                        _items.TryRemove(slot.Key, out _);
+                        if (_items.TryRemove(slot.Key, out _))
+                        {
+                            _lastItemIds.TryRemove(slot.Key, out _);
+                            _itemVersions.TryRemove(slot.Key, out _);
+                        }
                         continue;
                     }
                     
@@ -98,25 +108,52 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player.Helpers
                     var inventoryTemplatePtr = Memory.ReadValue<ulong>(containedItemPtr + Offsets.LootItem.Template, false);
                     if (inventoryTemplatePtr == 0 || !MemDMA.IsValidVirtualAddress(inventoryTemplatePtr))
                     {
-                        _items.TryRemove(slot.Key, out _);
+                        if (_items.TryRemove(slot.Key, out _))
+                        {
+                            _lastItemIds.TryRemove(slot.Key, out _);
+                            _itemVersions.TryRemove(slot.Key, out _);
+                        }
                         continue;
                     }
+                    
+                    // Read item version - this changes when item is modified/moved
+                    var itemVersion = Memory.ReadValue<int>(containedItemPtr + Offsets.LootItem.Version, false);
                     
                     var mongoId = Memory.ReadValue<MongoID>(inventoryTemplatePtr + Offsets.ItemTemplate._id, false);
                     var id = mongoId.ReadString();
                     
-                    if (!string.IsNullOrEmpty(id) && TarkovDataManager.AllItems.TryGetValue(id, out var item))
+                    // Validate the ID looks reasonable (BSG IDs are 24 char hex strings)
+                    if (string.IsNullOrEmpty(id) || id.Length < 20 || id.Length > 30)
+                    {
+                        // Invalid ID - slot might be corrupted or item removed
+                        if (_items.TryRemove(slot.Key, out _))
+                        {
+                            _lastItemIds.TryRemove(slot.Key, out _);
+                            _itemVersions.TryRemove(slot.Key, out _);
+                        }
+                        continue;
+                    }
+                    
+                    if (TarkovDataManager.AllItems.TryGetValue(id, out var item))
                     {
                         _items[slot.Key] = item;
+                        _lastItemIds[slot.Key] = id;
+                        _itemVersions[slot.Key] = itemVersion;
                     }
                     else
                     {
-                        _items.TryRemove(slot.Key, out _);
+                        if (_items.TryRemove(slot.Key, out _))
+                        {
+                            _lastItemIds.TryRemove(slot.Key, out _);
+                            _itemVersions.TryRemove(slot.Key, out _);
+                        }
                     }
                 }
                 catch
                 {
                     _items.TryRemove(slot.Key, out _);
+                    _lastItemIds.TryRemove(slot.Key, out _);
+                    _itemVersions.TryRemove(slot.Key, out _);
                 }
             }
         }
