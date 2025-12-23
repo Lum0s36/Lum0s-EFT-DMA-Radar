@@ -37,7 +37,7 @@ This app has been tested on 🪟 Windows 11 25H2 (Game) and 🪟 Windows 11 23H2
 
 This Chair creates it's own Config folder to be distinguishable from other config folders.
 - File location: C:\User\AppData\Roaming\Lum0s-EFT-DMA
-- File name: Config-EFT.json
+- File name: [Config-EFT.json](Config-EFT.json)
 - Don't have a file with pre set Lootfilters and Watchlist? There's one in Master
 
 ##  Common Issues ⚠️
