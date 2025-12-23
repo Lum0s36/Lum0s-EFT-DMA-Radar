@@ -529,6 +529,19 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
             }
         }
 
+        public bool AimviewShowQuestLocations
+        {
+            get => App.Config.AimviewWidget.ShowQuestLocations;
+            set
+            {
+                if (App.Config.AimviewWidget.ShowQuestLocations != value)
+                {
+                    App.Config.AimviewWidget.ShowQuestLocations = value;
+                    OnPropertyChanged(nameof(AimviewShowQuestLocations));
+                }
+            }
+        }
+
         public bool AimviewShowAI
         {
             get => App.Config.AimviewWidget.ShowAI;

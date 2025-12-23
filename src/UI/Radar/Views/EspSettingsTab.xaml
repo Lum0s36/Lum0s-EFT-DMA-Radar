@@ -238,6 +238,7 @@
                         <CheckBox Content="Show Meds" IsChecked="{Binding EspMeds, Mode=TwoWay}" Margin="0,0,16,8" />
                         <CheckBox Content="Show Backpacks" IsChecked="{Binding EspBackpacks, Mode=TwoWay}" Margin="0,0,16,8" />
                         <CheckBox Content="Show Quest Items" IsChecked="{Binding EspQuestLoot, Mode=TwoWay}" Margin="0,0,16,8" />
+                        <CheckBox Content="Show Quest Locations" IsChecked="{Binding EspQuestLocations, Mode=TwoWay}" Margin="0,0,16,8" ToolTip="Show quest zone markers in ESP" />
                         <CheckBox Content="Show Corpses" IsChecked="{Binding EspCorpses, Mode=TwoWay}" Margin="0,0,16,8" />
                         <CheckBox Content="Show Containers" IsChecked="{Binding EspContainers, Mode=TwoWay}" Margin="0,0,16,8" />
                      </WrapPanel>

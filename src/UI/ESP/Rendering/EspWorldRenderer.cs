@@ -3,9 +3,11 @@
  * MIT License - Copyright (c) 2025 Lone DMA
  */
 
+using System.Drawing;
 using LoneEftDmaRadar.DMA;
 using LoneEftDmaRadar.Tarkov.GameWorld.Exits;
 using LoneEftDmaRadar.Tarkov.GameWorld.Explosives;
+using LoneEftDmaRadar.Tarkov.GameWorld.Quests;
 using LoneEftDmaRadar.UI.Skia;
 using SharpDX.Mathematics.Interop;
 using SkiaSharp;
@@ -14,7 +16,7 @@ using DxColor = SharpDX.Mathematics.Interop.RawColorBGRA;
 namespace LoneEftDmaRadar.UI.ESP.Rendering
 {
     /// <summary>
-    /// Handles rendering of world elements (exfils, tripwires, grenades) on the ESP overlay.
+    /// Handles rendering of world elements (exfils, tripwires, grenades, quest locations) on the ESP overlay.
     /// </summary>
     internal sealed class EspWorldRenderer
     {
@@ -65,6 +67,20 @@ namespace LoneEftDmaRadar.UI.ESP.Rendering
                 {
                     DrawGrenade(context, grenade);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Renders all quest locations on the ESP overlay.
+        /// </summary>
+        public void DrawQuestLocations(EspRenderContext context, IReadOnlyDictionary<string, QuestLocation> locations)
+        {
+            if (!App.Config.UI.EspQuestLocations || locations == null || locations.Count == 0)
+                return;
+
+            foreach (var location in locations.Values)
+            {
+                DrawQuestLocation(context, location);
             }
         }
 
@@ -193,6 +209,32 @@ namespace LoneEftDmaRadar.UI.ESP.Rendering
                 $"Grenade D:{distance:F0}m",
                 screen.X + radius + ESPConstants.TextOffsetFromMarker,
                 screen.Y,
+                color,
+                textSize);
+        }
+
+        private void DrawQuestLocation(EspRenderContext context, QuestLocation location)
+        {
+            if (location.Position == Vector3.Zero)
+                return;
+
+            if (!context.WorldToScreenWithScale(location.Position, out var screen, out float scale))
+                return;
+
+            float distance = context.DistanceTo(location.Position);
+            var color = EspColorHelper.GetQuestZoneColor();
+
+            // Draw marker (square to differentiate from other markers)
+            float size = context.GetScaledRadius(scale) * 1.5f;
+            var rect = new RectangleF(screen.X - size, screen.Y - size, size * 2, size * 2);
+            context.Ctx.DrawFilledRect(rect, color);
+
+            // Draw label with action text
+            var textSize = context.GetTextSize(scale);
+            context.Ctx.DrawText(
+                $"{location.ActionText} D:{distance:F0}m",
+                screen.X + size + ESPConstants.TextOffsetFromMarker,
+                screen.Y + ESPConstants.TextOffsetFromMarker,
                 color,
                 textSize);
         }

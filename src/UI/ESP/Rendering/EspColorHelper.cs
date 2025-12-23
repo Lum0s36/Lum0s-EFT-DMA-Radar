@@ -125,6 +125,11 @@ namespace LoneEftDmaRadar.UI.ESP.Rendering
         public static DxColor GetQuestItemColor() => ToColor(SKPaints.PaintQuestItem);
 
         /// <summary>
+        /// Gets the color for quest zones/locations.
+        /// </summary>
+        public static DxColor GetQuestZoneColor() => ToColor(SKPaints.PaintQuestZone);
+
+        /// <summary>
         /// Gets the color for wishlist items.
         /// </summary>
         public static DxColor GetWishlistItemColor() => ToColor(SKPaints.PaintWishlistItem);

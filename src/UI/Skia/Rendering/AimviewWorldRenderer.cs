@@ -7,6 +7,7 @@ using LoneEftDmaRadar.Tarkov.GameWorld.Exits;
 using LoneEftDmaRadar.Tarkov.GameWorld.Explosives;
 using LoneEftDmaRadar.Tarkov.GameWorld.Loot;
 using LoneEftDmaRadar.Tarkov.GameWorld.Player;
+using LoneEftDmaRadar.Tarkov.GameWorld.Quests;
 using LoneEftDmaRadar.Tarkov.Unity.Structures;
 using SkiaSharp;
 using CameraManagerNew = LoneEftDmaRadar.Tarkov.GameWorld.Camera.CameraManager;
@@ -14,7 +15,7 @@ using CameraManagerNew = LoneEftDmaRadar.Tarkov.GameWorld.Camera.CameraManager;
 namespace LoneEftDmaRadar.UI.Skia.Rendering
 {
     /// <summary>
-    /// Handles rendering of world elements (exfils, explosives, containers) in the Aimview widget.
+    /// Handles rendering of world elements (exfils, explosives, containers, quest locations) in the Aimview widget.
     /// </summary>
     public sealed class AimviewWorldRenderer
     {
@@ -174,6 +175,42 @@ namespace LoneEftDmaRadar.UI.Skia.Rendering
                     IsAntialias = true
                 };
                 DrawLabel(container.Name ?? "Container", screen, r, scale, textPaint);
+            }
+        }
+
+        public void DrawQuestLocations(LocalPlayer localPlayer, IReadOnlyDictionary<string, QuestLocation> locations)
+        {
+            if (!App.Config.AimviewWidget.ShowQuestLocations || locations is null || locations.Count == 0)
+                return;
+
+            foreach (var location in locations.Values)
+            {
+                try
+                {
+                    if (!TryProject(location.Position, out var screen, out float scale, localPlayer))
+                        continue;
+
+                    float distance = Vector3.Distance(localPlayer.Position, location.Position);
+                    float r = Math.Clamp(4f * App.Config.UI.UIScale * scale, 2f, 15f);
+
+                    // Draw quest zone marker (square shape to differentiate from other markers)
+                    var rect = new SKRect(screen.X - r, screen.Y - r, screen.X + r, screen.Y + r);
+                    _canvas.DrawRect(rect, SKPaints.PaintQuestZone);
+
+                    // Draw label with quest info
+                    string label = $"{location.ActionText} D:{distance:F0}m";
+                    using var textPaint = new SKPaint
+                    {
+                        Color = SKPaints.PaintQuestZone.Color,
+                        IsStroke = false,
+                        IsAntialias = true
+                    };
+                    DrawLabel(label, screen, r, scale, textPaint);
+                }
+                catch
+                {
+                    continue;
+                }
             }
         }
 

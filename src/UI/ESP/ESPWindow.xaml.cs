@@ -219,6 +219,9 @@ namespace LoneEftDmaRadar.UI.ESP
                 // Render exfils - use context.Exits
                 _worldRenderer.DrawExfils(context, context.Exits);
 
+                // Render quest locations
+                _worldRenderer.DrawQuestLocations(context, context.QuestManager?.LocationConditions);
+
                 // Render tripwires - use context.Explosives
                 _worldRenderer.DrawTripwires(context, context.Explosives);
 

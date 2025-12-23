@@ -396,6 +396,19 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
             }
         }
 
+        public bool EspQuestLocations
+        {
+            get => App.Config.UI.EspQuestLocations;
+            set
+            {
+                if (App.Config.UI.EspQuestLocations != value)
+                {
+                    App.Config.UI.EspQuestLocations = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
         public bool EspShowWishlisted
         {
             get => App.Config.UI.EspShowWishlisted;

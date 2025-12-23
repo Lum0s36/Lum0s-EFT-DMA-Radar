@@ -324,6 +324,10 @@ Configure what entities are rendered in the Aimview widget.
                                   ToolTip="Show quest items in Aimview widget"
                                   IsChecked="{Binding AimviewShowQuestItems, Mode=TwoWay}"
                                   Margin="0,0,16,8" />
+                        <CheckBox Content="Show Quest Locations"
+                                  ToolTip="Show quest zone markers in Aimview widget"
+                                  IsChecked="{Binding AimviewShowQuestLocations, Mode=TwoWay}"
+                                  Margin="0,0,16,8" />
                         <CheckBox Content="Show AI"
                                   ToolTip="Show AI/Scavs/Bosses in Aimview widget"
                                   IsChecked="{Binding AimviewShowAI, Mode=TwoWay}"

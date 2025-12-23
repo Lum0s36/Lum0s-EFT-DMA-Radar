@@ -150,6 +150,9 @@ namespace LoneEftDmaRadar
         [JsonPropertyName("espQuestLoot")]
         public bool EspQuestLoot { get; set; } = true;
 
+        [JsonPropertyName("espQuestLocations")]
+        public bool EspQuestLocations { get; set; } = true;
+
         [JsonPropertyName("espLootPrice")]
         public bool EspLootPrice { get; set; } = true;
 

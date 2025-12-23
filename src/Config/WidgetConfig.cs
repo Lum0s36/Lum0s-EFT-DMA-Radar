@@ -28,6 +28,9 @@ namespace LoneEftDmaRadar
         [JsonPropertyName("showQuestItems")]
         public bool ShowQuestItems { get; set; } = true;
 
+        [JsonPropertyName("showQuestLocations")]
+        public bool ShowQuestLocations { get; set; } = true;
+
         [JsonPropertyName("showAI")]
         public bool ShowAI { get; set; } = true;
 

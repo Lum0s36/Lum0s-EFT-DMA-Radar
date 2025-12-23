@@ -9,6 +9,7 @@ using LoneEftDmaRadar.Tarkov.GameWorld.Exits;
 using LoneEftDmaRadar.Tarkov.GameWorld.Explosives;
 using LoneEftDmaRadar.Tarkov.GameWorld.Loot;
 using LoneEftDmaRadar.Tarkov.GameWorld.Player;
+using LoneEftDmaRadar.Tarkov.GameWorld.Quests;
 using SkiaSharp;
 using DxColor = SharpDX.Mathematics.Interop.RawColorBGRA;
 
@@ -107,6 +108,11 @@ namespace LoneEftDmaRadar.UI.ESP.Rendering
         /// Loot manager for the current raid.
         /// </summary>
         public LootManager Loot => GameState.Loot;
+
+        /// <summary>
+        /// Quest manager for the current raid.
+        /// </summary>
+        public QuestManager QuestManager => GameState.QuestManager;
 
         /// <summary>
         /// True if currently in a raid.

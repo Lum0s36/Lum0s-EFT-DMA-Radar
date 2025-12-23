@@ -9,6 +9,7 @@ using LoneEftDmaRadar.Tarkov.GameWorld.Player;
 using LoneEftDmaRadar.Tarkov.GameWorld.Exits;
 using LoneEftDmaRadar.Tarkov.GameWorld.Explosives;
 using LoneEftDmaRadar.Tarkov.GameWorld.Loot;
+using LoneEftDmaRadar.Tarkov.GameWorld.Quests;
 using LoneEftDmaRadar.UI.Misc;
 using LoneEftDmaRadar.UI.Skia.Rendering;
 using SkiaSharp.Views.WPF;
@@ -39,6 +40,7 @@ namespace LoneEftDmaRadar.UI.Skia
         private static IReadOnlyCollection<AbstractPlayer> AllPlayers => Memory.Players;
         private static IReadOnlyCollection<IExitPoint> Exits => Memory.Exits;
         private static IReadOnlyCollection<IExplosiveItem> Explosives => Memory.Explosives;
+        private static QuestManager QuestManager => Memory.Game?.QuestManager;
         private static bool InRaid => Memory.InRaid;
 
         public override void Draw(SKCanvas canvas)
@@ -68,6 +70,7 @@ namespace LoneEftDmaRadar.UI.Skia
                 _worldRenderer.DrawExfils(localPlayer, Exits);
                 _worldRenderer.DrawExplosives(localPlayer, Explosives);
                 _worldRenderer.DrawStaticContainers(localPlayer, Memory.Game?.Loot?.AllLoot?.OfType<StaticLootContainer>());
+                _worldRenderer.DrawQuestLocations(localPlayer, QuestManager?.LocationConditions);
                 
                 _lootRenderer.DrawCorpseMarkers(localPlayer, Memory.Game?.Loot?.AllLoot?.OfType<LootCorpse>());
                 _lootRenderer.DrawFilteredLoot(localPlayer, Memory.Game?.Loot?.FilteredLoot);
