@@ -83,24 +83,25 @@ namespace SDK
             public const uint MovementContext = 0x60; // EFT.MovementContext
             public const uint _playerBody = 0x190; // EFT.PlayerBody
             public const uint Physical = 0x8F8; // -.\uE399 <Physical> Physical
-            public const uint Corpse = 0x678; // EFT.Interactive.Corpse
-            public const uint Location = 0x868; // String
-            public const uint Profile = 0x8E0; // EFT.Profile
+            public const uint Corpse = 0x680; // EFT.Interactive.Corpse
+            public const uint Location = 0x870; // String
+            public const uint Profile = 0x900; // EFT.Profile
             public const uint ProceduralWeaponAnimation = 0x338; // EFT.Animations.ProceduralWeaponAnimation
             public const uint _inventoryController = 0x958; // EFT.PlayerInventoryController update
             public const uint _handsController = 0x960; // EFT.PlayerHands update
-            public const uint _playerLookRaycastTransform = 0x9E8; // UnityEngine.Transform
+            public const uint _playerLookRaycastTransform = 0xA08; // UnityEngine.Transform
         }
 
         public readonly partial struct ObservedPlayerView
         {
-			public const uint ObservedPlayerController = 0x20; // EFT.NextObservedPlayer.ObservedPlayerController
-			public const uint Voice = 0x38; // string
-			public const uint GroupID = 0x78; // string
-			public const uint Side = 0x8C; // EFT.EPlayerSide
-			public const uint IsAI = 0x98; // bool
-			public const uint AccountId = 0xB0; // string
-			public const uint PlayerBody = 0xC8; // EFT.PlayerBody
+			public const uint ObservedPlayerController = 0x28; // EFT.NextObservedPlayer.ObservedPlayerController
+			public const uint Voice = 0x40; // string
+			public const uint Id = 0x7C; // int32_t - unique in-memory player ID
+			public const uint GroupID = 0x80; // string
+			public const uint Side = 0x94; // EFT.EPlayerSide
+			public const uint IsAI = 0xA0; // bool
+			public const uint AccountId = 0xC0; // string
+			public const uint PlayerBody = 0xD8; // EFT.PlayerBody
         }
 
         public readonly partial struct ObservedPlayerController

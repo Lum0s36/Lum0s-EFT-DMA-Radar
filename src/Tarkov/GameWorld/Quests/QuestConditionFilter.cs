@@ -54,13 +54,14 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Quests
                     if (objective is null)
                         continue;
 
+                    // Skip if objective is completed
                     if (!string.IsNullOrEmpty(objective.Id) && completedConditions.Contains(objective.Id))
                         continue;
 
                     if (_skipObjectiveTypes.Contains(objective.Type))
                         continue;
 
-                    ProcessObjective(objective, questId, masterItems, masterLocations, itemsDict, locationsDict);
+                    ProcessObjective(objective, questId, masterItems, masterLocations, itemsDict, locationsDict, completedConditions);
                 }
                 catch
                 {
@@ -75,7 +76,8 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Quests
             PooledSet<string> masterItems,
             PooledSet<string> masterLocations,
             ConcurrentDictionary<string, byte> itemsDict,
-            ConcurrentDictionary<string, QuestLocation> locationsDict)
+            ConcurrentDictionary<string, QuestLocation> locationsDict,
+            PooledSet<string> completedConditions)
         {
             // Handle quest items
             if (objective.Type == QuestObjectiveType.FindQuestItem)
@@ -101,7 +103,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Quests
             // Handle location-based objectives
             if (IsLocationObjective(objective.Type))
             {
-                ProcessLocationObjective(objective, questId, masterLocations, locationsDict);
+                ProcessLocationObjective(objective, questId, masterLocations, locationsDict, completedConditions);
             }
         }
 
@@ -117,9 +119,14 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Quests
             TarkovDataManager.TaskElement.ObjectiveElement objective,
             string questId,
             PooledSet<string> masterLocations,
-            ConcurrentDictionary<string, QuestLocation> locationsDict)
+            ConcurrentDictionary<string, QuestLocation> locationsDict,
+            PooledSet<string> completedConditions)
         {
             if (objective.Zones is null || objective.Zones.Count == 0)
+                return;
+
+            // Skip if objective is completed
+            if (!string.IsNullOrEmpty(objective.Id) && completedConditions.Contains(objective.Id))
                 return;
 
             if (!TarkovDataManager.TaskZones.TryGetValue(MapID, out var zonesForMap))
