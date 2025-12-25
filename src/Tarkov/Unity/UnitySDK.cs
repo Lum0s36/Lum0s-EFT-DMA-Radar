@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Lone EFT DMA Radar
  * Brought to you by Lone (Lone DMA)
  * 
@@ -34,7 +34,7 @@ namespace LoneEftDmaRadar.Tarkov.Unity
     {
         public readonly struct UnityOffsets
         {
-            public const uint GameObjectManager = 0x1A208D8;
+            public const uint GameObjectManager = 0x1A233A0;
             public const uint AllCameras = 0x19F0100;
             //public const uint PhysiX = 0x1ACD770;
 
@@ -51,11 +51,11 @@ namespace LoneEftDmaRadar.Tarkov.Unity
             public const uint Component_GameObjectOffset = 0x58;
 
             public const uint TransformInternal_TransformAccessOffset = 0x90;
-            public const uint TransformAccess_IndexOffset = 0x98;
-            public const uint TransformAccess_HierarchyOffset = 0x90;
+            public const uint TransformAccess_IndexOffset = 0x78;
+            public const uint TransformAccess_HierarchyOffset = 0x70;
 
-            public const uint Hierarchy_VerticesOffset = 0x40;
-            public const uint Hierarchy_IndicesOffset = 0x90;
+            public const uint Hierarchy_VerticesOffset = 0x68;
+            public const uint Hierarchy_IndicesOffset = 0x40;
             //public const uint Hierarchy_RootPositionOffset = 0x40;
 
             public const uint Camera_ViewMatrixOffset = 0x128;
